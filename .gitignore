@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Salida de la herramienta (Reportes PDF/HTML)
+herramienta_cra/output/*
+!herramienta_cra/output/.gitkeep
+
+# Bases de datos locales (si usamos SQLite temporal)
+*.db
