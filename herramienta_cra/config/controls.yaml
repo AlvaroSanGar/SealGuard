@@ -1,0 +1,120 @@
+# config/controls.yaml
+# Configuración de Auditoría CRA - Perfil Servidor Linux General
+
+
+project:
+  name: "CRA Ubuntu Auditor"
+  # history_enabled: true  # POR DETERMINAR
+  storage_path: "output"
+
+
+#(Annex I.1.3 - Protección contra acceso no autorizado)
+network:
+  # WHITELIST
+  allowed_ports:
+    - 22 
+    - 80 
+    - 443 
+    - 8080 
+    - 3000 
+    - 3306 
+    - 5432 
+    - 6379 
+    - 27017 
+    - 9090 
+    - 9100 
+
+  # BLACKLIST
+  forbidden_ports:
+    21: "FTP - Inseguro (texto plano). Usar SFTP."
+    23: "Telnet - Inseguro (texto plano). Usar SSH."
+    69: "TFTP - Sin autenticación."
+    512: "Exec - Protocolo legacy inseguro."
+    513: "Login - Protocolo legacy inseguro."
+    514: "Shell - Protocolo legacy inseguro."
+    3389: "RDP - No recomendado en Linux."
+    5900: "VNC - Tráfico no cifrado por defecto."
+
+
+# (Anexo I.1.2 - Gestión de vulnerabilidades)
+vulnerabilities: 
+  enabled: true
+  min_cvss_score: 7.0 # Reportar vulns de riesgo alto
+  check_kernel: true
+  ignore_packages: [] # Paquetes de riesgo asumido
+  timeout: 30 
+
+
+#(Anexo I.1.2 - Gestión de identidades)
+system: 
+  critical_files:
+    - path: "/etc/shadow"
+      max_permissions: "640" # rw-r-----
+      owner: "root"
+
+    - path: "/etc/passwd"
+      max_permissions: "644" # rw-r--r--
+      owner: "root"
+
+    - path: "/etc/ssh/sshd_config"
+      max_permissions: "600" # rw-------
+      owner: "root"
+
+    - path: "/etc/crontab"
+      max_permissions: "644"
+      owner: "root"
+
+    - path: "/etc/sudoers" 
+      max_permissions: "440"
+      owner: "root"
+
+  users:
+    check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
+    disallow_empty_passwords: true
+    max_password_days: 90
+    min_uid_users: 1000
+
+  updates:
+    check_unattended_upgrades: true 
+    check_days_since_last_update: 7
+
+
+# (Anexo I.1.3 - Integridad de datos y sistema)
+integrity: 
+  monitored_binaries:
+    - "/bin/ls"
+    - "/bin/ps"
+    - "/bin/netstat"
+    - "/bin/login"
+    - "/usr/bin/sudo"
+    - "/usr/sbin/sshd"
+
+  monitored_configs:
+    - "/etc/hosts"
+    - "/etc/resolv.conf"
+    - "/etc/fstab"
+
+
+# (Anexo I.1.4 - Confidencialidad)
+hardening: 
+  ssh:
+    permit_root_login: ["no", "prohibit-password"]
+    password_authentication: "no"
+    protocol: "2"
+  firewall:
+    check_active: true
+    allowed_tools: ["ufw", "iptables"]
+
+
+# (Anexo I.1.4 - Confidencialidad)
+encryption: 
+  algorithm: "sha256"
+  check_luks: true
+  critical_mounts: ["/", "/home", "/var"]
+
+
+# (Anexo I.1.5 - Resiliencia)
+backups: 
+  check_crontab: true
+  check_systemd_timers: true
+  keywords: ["backup", "rsync", "tar", "snapshot", "aws s3", "rclone"]

@@ -1,0 +1,2 @@
+import nmap
+nm = PortScanner()
