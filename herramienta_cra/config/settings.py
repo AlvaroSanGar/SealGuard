@@ -15,4 +15,4 @@ def loadYaml(path):
         print("El archivo yaml contiene errores\n")
         sys.exit(1)
         
-CONFIG = loadYaml("config/controls.yaml")
+config = loadYaml("config/controls.yaml")

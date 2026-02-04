@@ -3,15 +3,14 @@
 
 
 project:
-  name: "CRA Ubuntu Auditor"
+  nombre: "CRA Ubuntu Auditor"
   # history_enabled: true  # POR DETERMINAR
   storage_path: "output"
 
 
 #(Annex I.1.3 - Protección contra acceso no autorizado)
 network:
-  # WHITELIST
-  allowed_ports:
+  white_list:
     - 22 
     - 80 
     - 443 
@@ -24,10 +23,9 @@ network:
     - 9090 
     - 9100 
 
-  # BLACKLIST
-  forbidden_ports:
-    21: "FTP - Inseguro (texto plano). Usar SFTP."
-    23: "Telnet - Inseguro (texto plano). Usar SSH."
+  black_list:
+    21: "FTP - Inseguro. Usar SFTP."
+    23: "Telnet - Inseguro. Usar SSH."
     69: "TFTP - Sin autenticación."
     512: "Exec - Protocolo legacy inseguro."
     513: "Login - Protocolo legacy inseguro."
@@ -40,8 +38,8 @@ network:
 vulnerabilities: 
   enabled: true
   min_cvss_score: 7.0 # Reportar vulns de riesgo alto
-  check_kernel: true
-  ignore_packages: [] # Paquetes de riesgo asumido
+  comp_kernel: true
+  ignorar: [] # Paquetes de riesgo asumido
   timeout: 30 
 
 
@@ -108,13 +106,13 @@ hardening:
 
 # (Anexo I.1.4 - Confidencialidad)
 encryption: 
-  algorithm: "sha256"
-  check_luks: true
+  algoritmo: "sha256"
+  comp_luks: true
   critical_mounts: ["/", "/home", "/var"]
 
 
 # (Anexo I.1.5 - Resiliencia)
 backups: 
-  check_crontab: true
-  check_systemd_timers: true
+  comp_crontab: true
+  comp_systemd_timers: true
   keywords: ["backup", "rsync", "tar", "snapshot", "aws s3", "rclone"]
