@@ -8,31 +8,27 @@ project:
   storage_path: "output"
 
 
-#(Annex I.1.3 - Protección contra acceso no autorizado)
+#
 network:
   white_list:
-    - 22 
-    - 80 
-    - 443 
-    - 8080 
-    - 3000 
-    - 3306 
-    - 5432 
-    - 6379 
-    - 27017 
-    - 9090 
-    - 9100 
+    - "ssh"
+    - "http"
+    - "https"
+    - "ipp"         
+    - "postgresql"
+    - "mysql"
+    - "domain"      # DNS
 
   black_list:
-    21: "FTP - Inseguro. Usar SFTP."
-    23: "Telnet - Inseguro. Usar SSH."
-    69: "TFTP - Sin autenticación."
-    512: "Exec - Protocolo legacy inseguro."
-    513: "Login - Protocolo legacy inseguro."
-    514: "Shell - Protocolo legacy inseguro."
-    3389: "RDP - No recomendado en Linux."
-    5900: "VNC - Tráfico no cifrado por defecto."
-
+    "ftp": "Tráfico en texto plano. Usar SFTP."
+    "telnet": "Acceso remoto inseguro. Usar SSH."
+    "vnc": "Escritorio remoto no cifrado por defecto."
+    "exec": "Comando remoto legacy."
+    "login": "Login remoto legacy."
+    "shell": "Shell remota legacy."
+    "unknown": "Servicio desconocido o sospechoso (Posible Netcat/Listener crudo)."
+    "bindshell": "Shell remota."
+    "echo": "A menudo usado por Netcat."
 
 # (Anexo I.1.2 - Gestión de vulnerabilidades)
 vulnerabilities: 

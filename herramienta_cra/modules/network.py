@@ -2,79 +2,102 @@ import nmap
 import sys
 from config.settings import config
 
-def scaneoPuertos(ip, verbose):
-    print("[+] Iniciando módulo de networking\n")
-    nm = nmap.PortScanner()
-    try:
-        nm.scan(ip, arguments='-sV -T4 --open')
+def scaneoPuertos(lista_ips, verbose):
+    print("[+] Iniciando módulo de networking")
+    if verbose:
+        print("     [i] Interfaces a escanear: "+str(lista_ips)+"\n")
     
-    except nmap.PortScannerError:
-        print("[ERROR] No se encuentra ha encontrado nmap\n")
-        sys.exit(1)
-        
-    except Exception as e:
-        print("[ERROR] Fallo al ejecutar nmap: "+e+"\n")
-        sys.exit(1)
-        
+    nm = nmap.PortScanner()
     white_list = config['network']['white_list']
     black_list = config['network']['black_list']
     resultados = []
-    
-    for host in nm.all_hosts():
-        nombre_host = nm[host].hostname()
-        print(f"\nResultados para: {host} ({nombre_host})")
-        
-        for proto in nm[host].all_protocols():
-            puertos = nm[host][proto].keys()
+
+    # Bucle principal
+    for ip in lista_ips:
+        if verbose:
+            print("\n     ----  Escaneando Interfaz: "+ip+"  ----")
+
+        try:
+            nm.scan(ip, arguments='-p- -sV --version-light --max-retries 1 -T4 --open') 
             
-            for puerto in sorted(puertos): 
-                info_puerto = nm[host][proto][puerto]
-                servicio = info_puerto['name']
-                producto = info_puerto['product']
-                version = info_puerto['version']
-                servicio_completo = f"{servicio} {producto} {version}".strip()
+        except nmap.PortScannerError:
+            print("     [ERROR] No se ha encontrado nmap\n")
+            sys.exit(1)
+            
+        except Exception as e:
+            print("     [ERROR] Fallo al ejecutar nmap en "+ip+": "+str(e)+"\n")
+            continue 
+
+        # --- CORRECCIÓN AQUÍ ---
+        # 1. Comprobamos si nmap no devolvió ningún host (caso común cuando no hay nada abierto)
+        if len(nm.all_hosts()) == 0:
+            print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
+            continue # Pasamos a la siguiente IP
+
+        # 2. Variable bandera para saber si encontramos algo dentro de los bucles
+        mensajeDetect = False
+
+        for host in nm.all_hosts():
+            nombre_host = nm[host].hostname()
+            if verbose:
+                print("     Nombre del host: "+nombre_host)
+            
+            for proto in nm[host].all_protocols():
+                puertos = nm[host][proto].keys()
                 
-                # --- LÓGICA DE CUMPLIMIENTO CRA ---
-                estado = "UNKNOWN"
-                mensaje = ""
-                peligro = "INFO"
+                for puerto in sorted(puertos): 
+                    # Si entramos aquí, es que hay al menos un puerto
+                    mensajeDetect = True 
+                    
+                    info_puerto = nm[host][proto][puerto]
+                    servicio = info_puerto['name'].lower()
+                    producto = info_puerto['product']
+                    version = info_puerto['version']
+                    
+                    servicio_completo = f"{servicio} {producto} {version}".strip()
+                    
+                    estado = "UNKNOWN"
+                    mensaje = ""
+                    peligro = "INFO"
 
-                # Black list
-                if puerto in black_list:
-                    estado = "FAIL"
-                    motivo = black_list[puerto]
-                    mensaje = "PROHIBIDO: " + motivo
-                    peligro = "ALTO"
-                    if verbose:
-                        print("  [X] " + str(puerto) + "/" + proto+" - "+servicio_completo+" -> "+mensaje+"\n")
+                    # Black list
+                    if servicio in black_list:
+                        estado = "FAIL"
+                        motivo = black_list[servicio]
+                        mensaje = "PROHIBIDO: " + motivo
+                        peligro = "ALTO"
+                        if verbose:
+                            print("     [X] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
 
-                # White list
-                elif puerto in white_list:
-                    estado = "PASS"
-                    mensaje = "Servicio autorizado en política."
-                    peligro = "BAJO"
-                    if verbose:
-                        print("  [V] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> OK\n")
+                    # White list 
+                    elif servicio in white_list:
+                        estado = "PASS"
+                        mensaje = "Servicio autorizado en política."
+                        peligro = "BAJO"
+                        if verbose:
+                            print("     [V] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> OK")
 
-                # No aparece en la lista
-                else:
-                    estado = "DESCONOCIDO"
-                    mensaje = "El puerto no aparece en ninguna de las listas, preferiblemente no debe estar abierto"
-                    peligro = "MEDIO"
-                    if verbose:
-                        print("  [!] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje+"\n")
+                    # Desconocido
+                    else:
+                        estado = "DESCONOCIDO"
+                        mensaje = "Servicio no listado ("+servicio+"), revisar política"
+                        peligro = "MEDIO"
+                        if verbose:
+                            print("     [!] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
 
-                resultados.append({
-                    "id": "RED-PUERTO",
-                    "puerto": puerto,
-                    "protocolo": proto,
-                    "servicio": servicio_completo,
-                    "estado": estado,
-                    "mensaje": mensaje,
-                    "peligro": peligro
-                })
+                    resultados.append({
+                        "ip": ip,  
+                        "puerto": puerto,
+                        "protocolo": proto,
+                        "servicio": servicio,
+                        "detalle": servicio_completo,
+                        "estado": estado,
+                        "mensaje": mensaje,
+                        "peligro": peligro
+                    })
+                    
+        if not mensajeDetect:
+            print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
 
-    if resultados == []:
-        print("  [i] No se encontraron puertos abiertos\n")
-    print("[-] Finalizando módulo de networking")
+    print("\n[-] Finalizando módulo de networking")
     return resultados
