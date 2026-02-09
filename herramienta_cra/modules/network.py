@@ -28,15 +28,12 @@ def scaneoPuertos(lista_ips, verbose):
             print("     [ERROR] Fallo al ejecutar nmap en "+ip+": "+str(e)+"\n")
             continue 
 
-        # --- CORRECCIÓN AQUÍ ---
-        # 1. Comprobamos si nmap no devolvió ningún host (caso común cuando no hay nada abierto)
+
         if len(nm.all_hosts()) == 0:
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
             continue # Pasamos a la siguiente IP
 
-        # 2. Variable bandera para saber si encontramos algo dentro de los bucles
         mensajeDetect = False
-
         for host in nm.all_hosts():
             nombre_host = nm[host].hostname()
             if verbose:
@@ -46,9 +43,7 @@ def scaneoPuertos(lista_ips, verbose):
                 puertos = nm[host][proto].keys()
                 
                 for puerto in sorted(puertos): 
-                    # Si entramos aquí, es que hay al menos un puerto
                     mensajeDetect = True 
-                    
                     info_puerto = nm[host][proto][puerto]
                     servicio = info_puerto['name'].lower()
                     producto = info_puerto['product']
