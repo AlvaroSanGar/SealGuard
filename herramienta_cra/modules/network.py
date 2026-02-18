@@ -1,5 +1,4 @@
 import nmap
-import sys
 from config.settings import config
 
 def scaneoPuertos(lista_ips, verbose):
@@ -21,8 +20,8 @@ def scaneoPuertos(lista_ips, verbose):
             nm.scan(ip, arguments='-p- -sV --version-light --max-retries 1 -T4 --open') 
             
         except nmap.PortScannerError:
-            print("     [ERROR] No se ha encontrado nmap\n")
-            sys.exit(1)
+            print("     [ERROR] No se ha encontrado nmap (saltando fase de escaneo de puertos)\n")
+            return [] # No vamos a poder hacer nada dentro del módulo
             
         except Exception as e:
             print("     [ERROR] Fallo al ejecutar nmap en "+ip+": "+str(e)+"\n")
@@ -31,33 +30,34 @@ def scaneoPuertos(lista_ips, verbose):
 
         if len(nm.all_hosts()) == 0:
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
-            continue # Pasamos a la siguiente IP
+            continue # Pasamos a la siguiente iteración
 
-        mensajeDetect = False
+        mensaje_p_encontrados = False
         for host in nm.all_hosts():
             nombre_host = nm[host].hostname()
             if verbose:
                 print("     Nombre del host: "+nombre_host)
             
-            for proto in nm[host].all_protocols():
+            for proto in nm[host].all_protocols(): # Con protocolo se refiere a TCP o UDP
                 puertos = nm[host][proto].keys()
                 
-                for puerto in sorted(puertos): 
-                    mensajeDetect = True 
+                for puerto in sorted(puertos):  # Los devolvemos ordenados para que sea más cómodo
+                    mensaje_p_encontrados = True 
                     info_puerto = nm[host][proto][puerto]
-                    servicio = info_puerto['name'].lower()
+                    servicio = info_puerto['name'].lower()  # En el yaml están en minuscula
                     producto = info_puerto['product']
                     version = info_puerto['version']
-                    
-                    servicio_completo = f"{servicio} {producto} {version}".strip()
-                    
                     estado = "UNKNOWN"
                     mensaje = ""
-                    peligro = "INFO"
-
+                    peligro = ""
+                    
+                    # Es más seguro para unirlo todo
+                    partes = [str(servicio), str(producto), str(version)]
+                    servicio_completo = " ".join(filter(None, partes))
+                    
                     # Black list
                     if servicio in black_list:
-                        estado = "FAIL"
+                        estado = "PROHIBIDO"
                         motivo = black_list[servicio]
                         mensaje = "PROHIBIDO: " + motivo
                         peligro = "ALTO"
@@ -66,7 +66,7 @@ def scaneoPuertos(lista_ips, verbose):
 
                     # White list 
                     elif servicio in white_list:
-                        estado = "PASS"
+                        estado = "ACEPTADO"
                         mensaje = "Servicio autorizado en política."
                         peligro = "BAJO"
                         if verbose:
@@ -91,7 +91,7 @@ def scaneoPuertos(lista_ips, verbose):
                         "peligro": peligro
                     })
                     
-        if not mensajeDetect:
+        if not mensaje_p_encontrados:
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
 
     print("\n[-] Finalizando módulo de networking")

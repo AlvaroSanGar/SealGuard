@@ -32,9 +32,7 @@ network:
 
 # (Anexo I.1.2 - Gestión de vulnerabilidades)
 vulnerabilities: 
-  enabled: true
   min_cvss_score: 7.0 # Reportar vulns de riesgo alto
-  comp_kernel: true
   ignorar: [] # Paquetes de riesgo asumido
   timeout: 30 
 
