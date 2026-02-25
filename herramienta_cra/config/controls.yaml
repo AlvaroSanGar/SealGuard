@@ -32,9 +32,7 @@ network:
 
 # (Anexo I.1.2 - Gestión de vulnerabilidades)
 vulnerabilities: 
-  enabled: true
   min_cvss_score: 7.0 # Reportar vulns de riesgo alto
-  comp_kernel: true
   ignorar: [] # Paquetes de riesgo asumido
   timeout: 30 
 
@@ -59,6 +57,10 @@ system:
       owner: "root"
 
     - path: "/etc/sudoers" 
+      max_permissions: "440"
+      owner: "root"
+
+    - path: "/boot/grub/grub.cfg" 
       max_permissions: "440"
       owner: "root"
 
