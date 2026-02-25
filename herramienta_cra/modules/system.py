@@ -1,5 +1,4 @@
 import subprocess   # Ejecutar comandos por consola
-import sys
 import json
 import platform     # Sacar info del sistema
 from collections import defaultdict

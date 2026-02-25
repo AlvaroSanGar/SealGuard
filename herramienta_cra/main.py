@@ -1,6 +1,7 @@
 import modules.network as mNetwork
 import modules.system as mSystem
 import modules.vulns as mVuln 
+import modules.integrity as mIntegrity
 
 if __name__ == "__main__":
     print("\n==================================================")
@@ -61,9 +62,9 @@ if __name__ == "__main__":
     paquetes_totales = paquetes_apt + paquetes_pip
     datos_reporte["paquetes"] = paquetes_totales
     
-    print("   [i] Paquetes de Sistema (APT): " + str(len(paquetes_apt)))
-    print("   [i] Paquetes de Python  (PIP): " + str(len(paquetes_pip)))
-    print("   [i] TOTAL paquetes detectados: " + str(len(paquetes_totales)))
+    print("     [i] Paquetes de Sistema (APT): " + str(len(paquetes_apt)))
+    print("     [i] Paquetes de Python  (PIP): " + str(len(paquetes_pip)))
+    print("     [i] TOTAL paquetes detectados: " + str(len(paquetes_totales)))
     
     # Ejemplo de top 3 paquetes encontrados
     if (len(paquetes_totales) > 0) and verbose:
@@ -99,7 +100,14 @@ if __name__ == "__main__":
         print("[!] No hay paquetes para analizar (Fase 2 vacía).")
     print("[-] Finalizando módulo de detección de vulnerabilidades")
 
-
+    ####################################################################################################################
+    print("\n--- [ FASE 3: INTEGRIDAD DE ARCHIVOS ] ---")
+    modo_baseline = False
+    
+    if modo_baseline:
+        mIntegrity.generar_baseline()
+    else:
+        datos_reporte["integridad"] = mIntegrity.verificar_integridad(verbose)
     ####################################################################################################################
 
     print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
@@ -109,4 +117,6 @@ if __name__ == "__main__":
     print(datos_reporte["puertos"])
     print("\n\n\nRESULTADOS DE VULNERABILIDADES\n")
     # Imprimimos solo los vulnerables para no saturar
-    #print(datos_reporte["vulns"])'''
+    #print(datos_reporte["vulns"])
+    print("\n\nRESULTADOS INTEGRIDAD")
+    print(datos_reporte["integridad"])'''

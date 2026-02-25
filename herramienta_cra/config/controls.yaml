@@ -60,6 +60,10 @@ system:
       max_permissions: "440"
       owner: "root"
 
+    - path: "/boot/grub/grub.cfg" 
+      max_permissions: "440"
+      owner: "root"
+
   users:
     check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
     disallow_empty_passwords: true
