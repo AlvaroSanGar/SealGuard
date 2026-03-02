@@ -2,6 +2,7 @@ import modules.network as mNetwork
 import modules.system as mSystem
 import modules.vulns as mVuln 
 import modules.integrity as mIntegrity
+import modules.users as mUsers
 
 if __name__ == "__main__":
     print("\n==================================================")
@@ -12,10 +13,12 @@ if __name__ == "__main__":
         "sistema": {},  # Diccionario
         "paquetes": [], # 
         "vulns": [], 
-        "puertos": []
+        "puertos": [],
+        "usuarios": [],
+        "2FA": []
     }
     verbose = True
-    
+    '''
     ####################################################################################################################
     
     # Info del sistema
@@ -107,7 +110,28 @@ if __name__ == "__main__":
     if modo_baseline:
         mIntegrity.generar_baseline()
     else:
-        datos_reporte["integridad"] = mIntegrity.verificar_integridad(verbose)
+        datos_reporte["integridad"] = mIntegrity.verificar_integridad(verbose)'''
+   ####################################################################################################################
+    print("\n--- [ FASE 4: ESCANEO DE USUARIOS ] ---")
+    print("[+] Iniciando módulo de escaneo de usuarios...")
+    '''
+    politicas_pass = mUsers.politicas_passwords(verbose)
+    uid_min = politicas_pass.get("UID_MIN")
+    if not uid_min:
+        uid_min = 1000
+    lista_usuarios = mUsers.info_usuarios_base(verbose, uid_min)
+    '''
+    a = mUsers.comp_2FA(verbose)
+    '''
+    # 3. Empaquetamos todo en el diccionario global de tu reporte
+    # (Asumiendo que tienes un diccionario llamado datos_reporte o similar)
+    datos_reporte["usuarios"] = {
+        "lista_usuarios": lista_usuarios,
+        "politicas_globales": politicas_pass
+        # "mfa_activado": mUsers.auditar_autenticacion_pam(verbose)  <-- Esto lo descomentaremos en el siguiente paso
+    }'''
+    
+    print("[-] Finalizando módulo de escaneo de usuarios")
     ####################################################################################################################
 
     print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
@@ -120,3 +144,7 @@ if __name__ == "__main__":
     #print(datos_reporte["vulns"])
     print("\n\nRESULTADOS INTEGRIDAD")
     print(datos_reporte["integridad"])'''
+    print("\n\nRESULTADOS USUARIOS")
+    #print(str(lista_usuarios)+"\n\n\n")
+    #print(str(politicas_pass))
+    
