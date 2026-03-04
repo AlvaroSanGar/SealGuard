@@ -145,3 +145,10 @@ def verificar_integridad(verbose):
             
     print("[-] Finalizando módulo de integridad")
     return resultados
+
+
+
+
+def ESCANEO_integridad(verbose):
+    resultado = verificar_integridad(verbose)
+    return resultado
