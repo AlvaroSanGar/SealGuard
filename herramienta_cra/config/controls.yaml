@@ -119,12 +119,12 @@ users:
         - "pam_duo.so"
         - "pam_yubico.so"
         - "pam_u2f.so"
+
       servicios_pam_a_revisar:
         - "sshd"
         - "sudo"
         - "login"
-      parametros_ssh_requeridos:
-        - "UsePAM yes"
-        - "ChallengeResponseAuthentication yes"
-        - "KbdInteractiveAuthentication yes"
-      fichero_token_usuario: ".google_authenticator"
+
+      tokens_requeridos:
+        ".google_authenticator": "pam_google_authenticator.so"
+        ".yubico": "pam_yubico.so"

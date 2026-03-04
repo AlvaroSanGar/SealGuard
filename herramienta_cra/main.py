@@ -10,17 +10,17 @@ if __name__ == "__main__":
     print("==================================================\n")
     
     datos_reporte = {
-        "sistema": {},  # Diccionario
-        "paquetes": [], # 
+        "sistema": {},  
+        "paquetes": [], 
         "vulns": [], 
         "puertos": [],
+        "politicas_contra": [],
         "usuarios": [],
         "2FA": []
     }
     verbose = True
-    '''
     ####################################################################################################################
-    
+    '''
     # Info del sistema
     info_sis = mSystem.info_sis() # Es un diccionario
     datos_reporte["sistema"] = info_sis 
@@ -39,8 +39,6 @@ if __name__ == "__main__":
     lista_objetivos = []
     
     # Usamos las IPv4 para el módulo de networking
-    # Para ello como cada interfaz suele tener más ips asociadas sacamos la lista de Ips de cada interfaz y comprobamos
-    # una a una el tipo
     for _, direcciones in interfaces.items():
         for direccion in direcciones:
             if direccion['tipo'] == 'inet':
@@ -111,40 +109,24 @@ if __name__ == "__main__":
         mIntegrity.generar_baseline()
     else:
         datos_reporte["integridad"] = mIntegrity.verificar_integridad(verbose)'''
+        
    ####################################################################################################################
-    print("\n--- [ FASE 4: ESCANEO DE USUARIOS ] ---")
-    print("[+] Iniciando módulo de escaneo de usuarios...")
-    '''
-    politicas_pass = mUsers.politicas_passwords(verbose)
-    uid_min = politicas_pass.get("UID_MIN")
-    if not uid_min:
-        uid_min = 1000
-    lista_usuarios = mUsers.info_usuarios_base(verbose, uid_min)
-    '''
-    a = mUsers.comp_2FA(verbose)
-    '''
-    # 3. Empaquetamos todo en el diccionario global de tu reporte
-    # (Asumiendo que tienes un diccionario llamado datos_reporte o similar)
-    datos_reporte["usuarios"] = {
-        "lista_usuarios": lista_usuarios,
-        "politicas_globales": politicas_pass
-        # "mfa_activado": mUsers.auditar_autenticacion_pam(verbose)  <-- Esto lo descomentaremos en el siguiente paso
-    }'''
-    
-    print("[-] Finalizando módulo de escaneo de usuarios")
+    usu = mUsers.ESCANER_usuarios(verbose)
+    datos_reporte["politicas_contra"] = usu.get("politicas")
+    datos_reporte["usuarios"] = usu.get("usuarios")
+    datos_reporte["2FA"] = usu.get("2FA")
     ####################################################################################################################
 
     print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
-    '''print("RESULTADOS SISTEMA\n")
-    print(datos_reporte["sistema"])
-    print("\n\n\nRESULTADOS DE NETWORKING\n")
-    print(datos_reporte["puertos"])
-    print("\n\n\nRESULTADOS DE VULNERABILIDADES\n")
-    # Imprimimos solo los vulnerables para no saturar
-    #print(datos_reporte["vulns"])
-    print("\n\nRESULTADOS INTEGRIDAD")
-    print(datos_reporte["integridad"])'''
-    print("\n\nRESULTADOS USUARIOS")
-    #print(str(lista_usuarios)+"\n\n\n")
-    #print(str(politicas_pass))
+    
+    # (Comentados temporalmente hasta que se haga el reporte final)
+    '''
+    print("RESULTADOS SISTEMA\n", datos_reporte["sistema"])
+    print("\n\nRESULTADOS DE NETWORKING\n", datos_reporte["puertos"])
+    print("\n\nRESULTADOS DE VULNERABILIDADES\n", datos_reporte["vulns"])
+    print("\n\nRESULTADOS INTEGRIDAD\n", datos_reporte["integridad"])
+    '''
+    print("\n\nRESULTADOS POLITICAS\n",datos_reporte["politicas_contra"])
+    print("\n\nRESULTADOS USUARIOS\n",datos_reporte["usuarios"])
+    print("\n\nRESULTADOS 2FA\n",datos_reporte["2FA"])
     
