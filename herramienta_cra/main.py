@@ -4,7 +4,7 @@ if __name__ == "__main__":
     print("\n==================================================")
     print("      AUDITORÍA DE CUMPLIMIENTO CRA (LINUX)      ")
     print("==================================================\n")
-    baseline = True
+    baseline = False
     verbose = True
     if baseline:
         escaneo_baseline()

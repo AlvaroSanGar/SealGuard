@@ -103,11 +103,11 @@ def paquetes_python():
 
 def ESCANEO_info_Simple(verbose):
     # Info del sistema
-    info_sis = info_sis() # Es un diccionario 
+    info = info_sis() # Es un diccionario 
     if verbose:
         print("[+] Información del sistema: ")
-        print("     [i] Hostname:      "+info_sis['hostname'])
-        print("     [i] Sistema:       "+info_sis['dist']+" "+info_sis['version'])
-        print("     [i] Kernel:        "+info_sis['kernel'])
-        print("     [i] Arquitectura:  "+info_sis['arquitectura']+"\n")
-    return info_sis
+        print("     [i] Hostname:      "+info['hostname'])
+        print("     [i] Sistema:       "+info['dist']+" "+info['version'])
+        print("     [i] Kernel:        "+info['kernel'])
+        print("     [i] Arquitectura:  "+info['arquitectura']+"\n")
+    return info
