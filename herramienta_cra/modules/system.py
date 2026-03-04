@@ -96,3 +96,18 @@ def paquetes_python():
         p['ecosystem'] = 'PyPI'
         p['type'] = 'Python (PIP)'
     return resultado
+
+
+
+
+
+def ESCANEO_info_Simple(verbose):
+    # Info del sistema
+    info = info_sis() # Es un diccionario 
+    if verbose:
+        print("[+] Información del sistema: ")
+        print("     [i] Hostname:      "+info['hostname'])
+        print("     [i] Sistema:       "+info['dist']+" "+info['version'])
+        print("     [i] Kernel:        "+info['kernel'])
+        print("     [i] Arquitectura:  "+info['arquitectura']+"\n")
+    return info

@@ -1,4 +1,5 @@
 import requests
+import modules.system as mSystem
 import json
 
 def escanear_vulnerabilidades(paquetes):
@@ -55,3 +56,71 @@ def escanear_vulnerabilidades(paquetes):
             print("    [ERROR] Fallo de conexión con OSV.dev: " + str(e))
 
     return hallazgos
+
+
+
+
+
+def ESCANER_vulnerabilidades(verbose):
+    # Diccionario de retorno con la estructura solicitada
+    datos_reporte = {
+        "paquetes": {
+            "apt": 0,
+            "pip": 0
+        },
+        "vulns": []
+    }
+
+    print("\n--- [ FASE 2: AUDITORÍA DE VULNERABILIDADES ] ---")
+    print("[+] Iniciando listado de paquetes instalados")
+    
+    # Obtenemos ambos tipos de paquetes
+    paquetes_apt = mSystem.paquetes_instalados()
+    paquetes_pip = mSystem.paquetes_python()
+    
+    # Sumamos las listas
+    paquetes_totales = paquetes_apt + paquetes_pip
+    
+    # Guardamos en datos_reporte el num de paquetes pip y apt
+    datos_reporte["paquetes"]["apt"] = len(paquetes_apt)
+    datos_reporte["paquetes"]["pip"] = len(paquetes_pip)
+    
+    print("     [i] Paquetes de Sistema (APT): " + str(len(paquetes_apt)))
+    print("     [i] Paquetes de Python  (PIP): " + str(len(paquetes_pip)))
+    print("     [i] TOTAL paquetes detectados: " + str(len(paquetes_totales)))
+    
+    # Ejemplo de top 3 paquetes encontrados
+    if (len(paquetes_totales) > 0) and verbose:
+        ejemplos = []
+        for p in paquetes_totales[:3]:
+            ejemplos.append(p['name'] + " " + p['version'])     
+        print("   [i] Ejemplos: " + ", ".join(ejemplos) + "...")
+    elif verbose:
+        print("    [i] No se detectaron paquetes")
+
+    print("[-] Finalizando listado de paquetes")
+
+    ####################################################################################################################
+    
+    print("[+] Iniciando módulo de detección de vulnerabilidades")
+    if len(paquetes_totales) > 0:
+        # Llamamos al escáner
+        vulns = escanear_vulnerabilidades(paquetes_totales)
+        datos_reporte["vulns"] = vulns
+        
+        print("[+] Análisis completado.")
+        print("   [i] Paquetes vulnerables detectados: " + str(len(vulns)))
+        
+        if verbose and len(vulns) > 0:
+            print("\n    [TOP 5 HALLAZGOS CRÍTICOS]")
+            # Ordenamos para ver los que tienen mas CVEs primero
+            vulns.sort(key=lambda x: x['cantidad'], reverse=True)
+            
+            for v in vulns[:5]:
+                primer_cve = v['cves'][0]
+                print("     [!] [" + v['tipo'] + "] " + v['paquete'] + " v" + v['version'] + " -> " + str(v['cantidad']) + " Vulns (" + primer_cve + "...)")
+    else:
+        print("[!] No hay paquetes para analizar (Fase 2 vacía).")
+    print("[-] Finalizando módulo de detección de vulnerabilidades")
+
+    return datos_reporte

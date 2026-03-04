@@ -1,7 +1,8 @@
 import nmap
+import modules.system as mSystem
 from config.settings import config
 
-def scaneoPuertos(lista_ips, verbose):
+def escaneo_puertos(lista_ips, verbose):
     print("[+] Iniciando módulo de networking")
     if verbose:
         print("     [i] Interfaces a escanear: "+str(lista_ips)+"\n")
@@ -95,4 +96,24 @@ def scaneoPuertos(lista_ips, verbose):
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
 
     print("\n[-] Finalizando módulo de networking")
+    return resultados
+
+
+def ESCANEO_Networking(verbose):
+    print("--- [ FASE 1: AUDITORÍA DE PUERTOS ] ---")
+    resultados = []
+    interfaces = mSystem.obtener_interfaces() # Diccionario donde cada clave tiene asociada una lista de diccionarios
+    lista_objetivos = []
+    
+    # Usamos las IPv4 para aplicarles nmap y obtener las interfaces levantadas
+    for _, direcciones in interfaces.items():
+        for direccion in direcciones:
+            if direccion['tipo'] == 'inet':
+                lista_objetivos.append(direccion['ip'])
+
+    if lista_objetivos:
+        resultados = escaneo_puertos(lista_objetivos, verbose)
+    else:
+        print("[ERROR] No se detectaron IPs para escanear\n")
+    
     return resultados
