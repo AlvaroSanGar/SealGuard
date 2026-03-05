@@ -128,7 +128,7 @@ def ESCANER_vulnerabilidades(verbose):
         "vulns": []
     }
 
-    print("\n--- [ FASE 2: INVENTARIO DEL SISTEMA ] ---")
+    print("\n--- [ FASE 2: AUDITORÍA DE VULNERABILIDADES ] ---")
     print("[+] Iniciando listado de paquetes instalados")
     
     # Obtenemos ambos tipos de paquetes

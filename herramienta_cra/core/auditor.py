@@ -21,11 +21,12 @@ def escaneo_normal(verbose):
     
     datos_reporte["sistema"] = ESCANEO_info_Simple(verbose)
     datos_reporte["puertos"] = ESCANEO_Networking(verbose)
-    datos_reporte["integridad"] = ESCANEO_integridad(verbose)
     
     vuln = ESCANER_vulnerabilidades(verbose)
     datos_reporte["paquetes"] = vuln.get("paquetes")
     datos_reporte["vulns"] = vuln.get("vulns")
+    
+    datos_reporte["integridad"] = ESCANEO_integridad(verbose)
     
     usu = ESCANER_usuarios(verbose)
     datos_reporte["politicas_contra"] = usu.get("politicas")

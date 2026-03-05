@@ -281,7 +281,7 @@ def ESCANER_usuarios(verbose):
         "2FA": {}
     }
     
-    print("\n--- [ FASE 4: ESCANEO DE USUARIOS ] ---")
+    print("\n--- [ FASE 4: AUDITORÍA DE USUARIOS ] ---")
     print("[+] Iniciando módulo de escaneo de usuarios...")
     resultados["politicas"] = politicas_passwords(verbose)
     
