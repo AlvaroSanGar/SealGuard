@@ -39,27 +39,7 @@ vulnerabilities:
 
 #(Anexo I.1.2 - Gestión de identidades)
 system: 
-  critical_files:
-    - path: "/etc/shadow"
-      max_permissions: "640" # rw-r-----
-      owner: "root"
-
-    - path: "/etc/passwd"
-      max_permissions: "644" # rw-r--r--
-      owner: "root"
-
-    - path: "/etc/ssh/sshd_config"
-      max_permissions: "600" # rw-------
-      owner: "root"
-
-    - path: "/etc/crontab"
-      max_permissions: "644"
-      owner: "root"
-
-    - path: "/etc/sudoers" 
-      max_permissions: "440"
-      owner: "root"
-
+  
   updates:
     check_unattended_upgrades: true 
     check_days_since_last_update: 7
@@ -82,14 +62,38 @@ integrity:
 
 
 # (Anexo I.1.4 - Confidencialidad)
+# (Anexo I.1.4 - Confidencialidad y Bastionado)
 hardening: 
+  critical_files:
+    - path: "/etc/shadow"
+      max_permissions: "640" # rw-r-----
+      owner: "root"
+    - path: "/etc/passwd"
+      max_permissions: "644" # rw-r--r--
+      owner: "root"
+    - path: "/etc/ssh/sshd_config"
+      max_permissions: "600" # rw-------
+      owner: "root"
+    - path: "/etc/crontab"
+      max_permissions: "644"
+      owner: "root"
+    - path: "/etc/sudoers" 
+      max_permissions: "440"
+      owner: "root"
+
   ssh:
     permit_root_login: ["no", "prohibit-password"]
     password_authentication: "no"
     protocol: "2"
+
   firewall:
     check_active: true
-    allowed_tools: ["ufw", "iptables"]
+    allowed_tools: ["ufw", "iptables", "firewalld"]
+
+  system_checks:
+    check_suid_sgid: true
+    check_aslr: true
+    check_mac: true # AppArmor / SELinux
 
 
 # (Anexo I.1.4 - Confidencialidad)

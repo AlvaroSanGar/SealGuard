@@ -52,7 +52,8 @@ def generar_baseline():
         # Comprobamos que nos devuelve la función, solo lo guardamos si obtenemos exitosamente el hash
         if hash_val == None:
             print("     [!] El archivo '"+ruta+"' no existe")
-            
+        
+        # Comprobamos si el contenido de hash_val es un string, si es así entonces de trata de un error (por si acaso lo comprobamos también)    
         elif isinstance(hash_val, str) and (hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:")):
             print("     [!] No se ha logrado obtener el archivo de '"+ruta+"' -> "+str(hash_val))
             
@@ -107,6 +108,7 @@ def verificar_integridad(verbose):
         if hash_val == None:
             print("     [!] El archivo '"+ruta+"' no existe")
             
+        # Igual que en baseline    
         elif isinstance(hash_val, str) and (hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:")):
             print("     [!] No se ha logrado obtener el archivo de '"+ruta+"' -> "+str(hash_val))
             
