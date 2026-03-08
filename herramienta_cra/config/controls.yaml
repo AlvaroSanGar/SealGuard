@@ -86,9 +86,11 @@ hardening:
     password_authentication: "no"
     protocol: "2"
 
-  firewall:
-    check_active: true
-    allowed_tools: ["ufw", "iptables", "firewalld"]
+  firewall_services:
+    - "ufw.service"
+    - "firewalld.service"
+    - "iptables.service"
+    - "nftables.service"
 
   system_checks:
     check_suid_sgid: true

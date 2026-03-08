@@ -165,7 +165,7 @@ def politicas_passwords(verbose):
 
 
 def comp_2FA(verbose, usuarios):
-    print("[+] Buscando métodos de doble factor (2FA)")
+    print("[+] Buscando métodos de doble factor de autentificación")
     modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
     servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']
