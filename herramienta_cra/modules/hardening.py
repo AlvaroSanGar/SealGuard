@@ -1,4 +1,4 @@
-import os
+import subprocess
 from modules.system import ejecutar_consulta
 from config.settings import config
 
@@ -44,6 +44,8 @@ def auditar_suid_sgid(verbose):
             
     
     return resultados
+
+
 
 
 
@@ -158,6 +160,8 @@ def auditar_archivos_criticos(verbose):
 
 
 
+
+
 ###################################################################################################################################
 
 def auditar_ssh(verbose):
@@ -170,10 +174,26 @@ def auditar_ssh(verbose):
     
     return reporte_ssh
 
-from config.settings import config # Asegúrate de tener esto importado arriba del todo
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#########################################################################################################################################################
 def auditar_firewall(verbose):
-    print(" [+] Comprobando el estado del Cortafuegos (Firewall)...")
+    print(" [+] Comprobando el estado del Firewall")
     
     resultado = {
         "estado": "PELIGROSO",
@@ -181,71 +201,162 @@ def auditar_firewall(verbose):
         "detalles": [],
         "alertas": []
     }
-
-    # --- 1. CAPA GESTOR: Leemos los servicios desde el YAML ---
     try:
-        gestores_config = config["hardening"]["firewall_services"]
+        lista_firewalls = config["hardening"]["firewall_services"]
+    
     except KeyError:
-        print("     [ERROR] No se ha encontrado la clave 'hardening -> firewall_services' en settings.yaml")
-        gestores_config = [] # Evitamos que el programa pete si falta la config
-
+        print("     [ERROR] No se han podido cargar los firewalls de la config.yaml")
+        lista_firewalls = []
+        
     servicios_activos = []
     
-    if gestores_config:
-        # Formateamos la lista para SQL: 'ufw.service', 'firewalld.service', ...
-        servicios_sql = ", ".join([f"'{s}'" for s in gestores_config])
-        query_servicios = f"SELECT id, active_state FROM systemd_units WHERE id IN ({servicios_sql});"
+    #################### Comprobación de firewalls en systemd #########################################################
+    if lista_firewalls:
+        # Preparamos la consulta SQL
+        firewalls_sql = ",".join([f"'{n}'" for n in lista_firewalls])
+        query_fir = 'SELECT id, active_state, unit_file_state FROM systemd_units WHERE id IN ('+firewalls_sql+');'
+        resultado_consulta = ejecutar_consulta(query_fir)        
         
-        res_servicios = ejecutar_consulta(query_servicios) # Usa mSystem.ejecutar_consulta si lo tienes en otro archivo
+        # Comprobamos si exsten los firewalls en el sistema e iteramos sobre la respuesta
+        if resultado_consulta:
+            for servicio in resultado_consulta:
+                nombre = servicio.get("id").replace(".service", "") # Limpiamos el nombre por comodidad ya que todos terminan en .service
+                estado_actu = servicio.get("active_state")
+                estado_arranque = servicio.get("unit_file_state")
+                
+                # Comprobamos si está activo y si por defecto se inicia al arrancar el sistema 
+                if estado_actu == 'active':
+                    servicios_activos.append(nombre)
+                    
+                    # Comprobamos si no está configurado para arrancar al iniciar el sistema
+                    if estado_arranque != 'enabled':
+                        alerta = "El gestor '" + nombre + "' está encendido ahora, pero no arrancará tras un reinicio (estado: " + str(estado_arranque) + ")"
+                        resultado["alertas"].append(alerta)
+                        if verbose:
+                            print("     [!] " + alerta)
+                            
+                # Caso de que estéconfigurado para arrancar siempre, pero actualmente está apagado o caído
+                elif estado_arranque == 'enabled' and estado_actu != 'active':
+                    alerta = "El gestor '" + nombre + "' debería estar encendido de forma persistente (enabled), pero actualmente está APAGADO."
+                    resultado["alertas"].append(alerta)
+                    if verbose:
+                        print("     [!] " + alerta)
 
-        if res_servicios:
-            for servicio in res_servicios:
-                if servicio.get("active_state") == "active":
-                    # Limpiamos el nombre (ej. 'ufw.service' -> 'ufw') para que quede más limpio en el reporte
-                    nombre_limpio = servicio.get("id", "").replace(".service", "")
-                    servicios_activos.append(nombre_limpio)
-
-    # --- 2. CAPA KERNEL: Buscamos si hay REGLAS EFECTIVAS de bloqueo (Agnóstico al gestor) ---
-    query_reglas = "SELECT count(*) AS total FROM iptables WHERE chain = 'INPUT' AND target IN ('DROP', 'REJECT');"
-    res_reglas = ejecutar_consulta(query_reglas)
-
+    ############## Comprobación de si ay normas activas (de bloquear y descartar) ########################################
     reglas_bloqueo = 0
-    if res_reglas and len(res_reglas) > 0:
+    politica_accept = False
+    bloqueo_output = False
+    bloqueo_forward = False
+    
+    # Tratamos de obtener las normas actuales del sistema con iptables -S (similar a las interfaces de networking)
+    # de esta forma buscamos las políticas que hemos obtenido y rechazan o bloquean peticiones (si no hay ninguna de este
+    # timpo, el firewall no estará filtrando nada, por lo que en la práctica sería como si no estuviese activo)
+    try:
+        # Leemos todas las posibles cadenas (OUTPUT, FORWARD, etc.)
+        res_iptables = subprocess.run(["iptables", "-S"], capture_output=True, text=True)
+        if res_iptables.returncode == 0:
+            for linea in res_iptables.stdout.splitlines():
+                # Buscamos políticas por defecto permisivas
+                if "-P INPUT ACCEPT" in linea:
+                    politica_accept = True
+                    
+                # Buscamos reglas generales de bloqueo
+                if "-P INPUT DROP" in linea or "-j DROP" in linea or "-j REJECT" in linea:
+                    reglas_bloqueo += 1
+                    
+                # Buscamos reglas de OUTPUT y FORWARD
+                if "OUTPUT" in linea and ("DROP" in linea or "REJECT" in linea):
+                    bloqueo_output = True
+                if "FORWARD" in linea and ("DROP" in linea or "REJECT" in linea):
+                    bloqueo_forward = True
+        elif verbose:
+            print("     [DEBUG] iptables devolvió error: " + res_iptables.stderr.strip().replace('\n', ' '))
+    except FileNotFoundError:
+        # Falla si los comandos iptables no están instalados en el sistema
+        pass
+    except Exception as e:
+        if verbose:
+            print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+            
+    # En algunos sistemas podemos no tener la opción anterior, por lo que lo volvemos a intentar esta vez
+    # con Nftables (versión más moderna)
+    if reglas_bloqueo == 0:
         try:
-            reglas_bloqueo = int(res_reglas[0].get("total", 0))
-        except ValueError:
+            res_nft = subprocess.run(["nft", "list", "ruleset"], capture_output=True, text=True)
+            if res_nft.returncode == 0:
+                # Convertimos toda la salida a minúsculas para buscar fácilmente
+                salida_nft = res_nft.stdout.lower()
+                
+                if "policy accept" in salida_nft:
+                    politica_accept = True
+                if "drop" in salida_nft or "reject" in salida_nft:
+                    reglas_bloqueo += 1
+                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
+                    bloqueo_output = True
+                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
+                    bloqueo_forward = True
+            elif verbose:
+                print("     [DEBUG] nft devolvió error: " + res_nft.stderr.strip().replace('\n', ' '))
+        except FileNotFoundError:
+            # Falla si los comandos nft no están instalados en el sistema
             pass
-
-    ##################### Clasificación #########################################################################
+        except Exception as e:
+            if verbose:
+                print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+    
+    ########### Clasificamos los resultados obtenidos ################################################################
     if reglas_bloqueo > 0:
         resultado["estado"] = "SEGURO"
+        # Caso de que el firewall está en systemd y tiene reglas de bloqueo en el kernel
+        if len(servicios_activos) > 0:
+            resultado["firewall_activo"] = " / ".join(servicios_activos)
+            resultado["detalles"].append('El sistema está protegido por '+resultado["firewall_activo"]+' y por '+str(reglas_bloqueo)+' reglas de bloqueo')
+            if verbose:
+                print("     [V] "+resultado["detalles"][-1])
         
-        gestor = " / ".join(servicios_activos) if len(servicios_activos) > 0 else "Reglas manuales en Kernel"
-        resultado["firewall_activo"] = gestor
-        
-        resultado["detalles"].append("Gestor detectado: " + gestor)
-        resultado["detalles"].append("Se han detectado " + str(reglas_bloqueo) + " reglas restrictivas (DROP/REJECT) en el tráfico de entrada.")
-        
-        if verbose:
-            print("     [V] Firewall activo (" + gestor + ") y bloqueando tráfico correctamente.")
-
+        # Caso de que el firewall no se está ejecutando pero hay reglas en el kernel
+        else:
+            resultado["firewall_activo"] = "Reglas de bloqueo manuales"
+            resultado["detalles"].append('No se ha detectado ningún servicio de getión activo, pero el sistema está protegido por '+str(reglas_bloqueo)+' reglas de bloqueo')
+            if verbose:
+                print("     [V] "+resultado["detalles"][-1])
+    
+    # Caso de que aunque está activo un firewall no hay reglas de bloqueo en el kernel, por lo que no se filtra
     elif len(servicios_activos) > 0:
         resultado["firewall_activo"] = " / ".join(servicios_activos)
-        alerta = "El servicio (" + resultado["firewall_activo"] + ") está encendido, pero NO hay reglas de bloqueo (DROP/REJECT) aplicadas en la cadena INPUT."
-        resultado["alertas"].append(alerta)
-        
+        resultado["alertas"].append('Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
         if verbose:
-            print("     [!] ATENCIÓN: " + alerta)
-            print("         - El servidor NO está filtrando el tráfico entrante.")
-
+            print('     [!] Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
+    
+    # No hay ni firewall ni reglas
     else:
-        alerta = "No se ha detectado ningún demonio de firewall activo ni reglas de bloqueo en el kernel."
-        resultado["alertas"].append(alerta)
-        
+        resultado["alertas"].append('No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encentra expuesto a la red')
         if verbose:
-            print("     [X] PELIGRO: El perímetro de red del servidor está totalmente expuesto.")
-
+            print('     [X] No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encentra expuesto a la red')
+            
+    ############## Alertas extra ####################################################################################
+    # Solo alertamos si el firewall está activo o hay reglas, porque si está apagado ya lo hemos dicho arriba.
+    if reglas_bloqueo > 0 or len(servicios_activos) > 0:
+        if politica_accept:
+            alerta_pol = "El firewall tiene políticas por defecto permisivas (ACCEPT). Se recomienda un enfoque 'Default Deny'"
+            resultado["alertas"].append(alerta_pol)
+            if verbose:
+                print("     [!] " + alerta_pol)
+                
+        if not bloqueo_output:
+            alerta_out = "No se han detectado reglas de bloqueo en la cadena OUTPUT"
+            resultado["alertas"].append(alerta_out)
+            if verbose:
+                print("     [!] " + alerta_out)
+                
+        if not bloqueo_forward:
+            alerta_fwd = "No se han detectado reglas de bloqueo en la cadena FORWARD. Riesgo de enrutamiento no deseado"
+            resultado["alertas"].append(alerta_fwd)
+            if verbose:
+                print("     [!] " + alerta_fwd)
+    
     return resultado
+
 
 
 
@@ -268,7 +379,14 @@ def auditar_aslr(verbose):
     }
     query = 'SELECT current_value FROM system_controls WHERE name = "kernel.randomize_va_space";'
     res = ejecutar_consulta(query)
-    val = int(res[0].get('current_value'))
+    
+    val = 0
+    if res and len(res) > 0: # Lo hacemos de forma segura
+        try:
+            val = int(res[0].get("current_value"))
+        except ValueError:
+            val = 0
+            
     match val:
         case 1:
             resultado["valor"] = 1
@@ -395,13 +513,6 @@ def auditar_certificados():
     resultados = {}
     
     return resultados
-
-
-def auditar_cifrado():
-    resultados = {}
-    
-    return resultados
-
 
 
 def ESCANER_hardening(verbose):

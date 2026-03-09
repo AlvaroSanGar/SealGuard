@@ -80,6 +80,10 @@ hardening:
     - path: "/etc/sudoers" 
       max_permissions: "440"
       owner: "root"
+  
+  suid_sgid:
+    critical_directories: ["/tmp/", "/home/", "/dev/shm/"]
+    forviden_permissions: ["2", "3", "6", "7"] # w, wx, rw, rwx
 
   ssh:
     permit_root_login: ["no", "prohibit-password"]
@@ -96,6 +100,11 @@ hardening:
     check_suid_sgid: true
     check_aslr: true
     check_mac: true # AppArmor / SELinux
+
+  certificates:
+    check_expiration_days: 30
+    private_keys_path: "/etc/ssl/private/"
+    max_key_permissions: "600"
 
 
 # (Anexo I.1.4 - Confidencialidad)
