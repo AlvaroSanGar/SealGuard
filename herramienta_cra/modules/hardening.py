@@ -515,6 +515,143 @@ def auditar_certificados():
     return resultados
 
 
+
+
+
+
+
+
+
+
+
+
+#################################################################################################################################
+def auditar_cifrado(verbose):
+    print(" [+] Comprobando el cifrado de discos (LUKS/FDE)...")
+    resultados = {
+        "estado": "PELIGROSO",
+        "detalles": [],
+        "alertas":[]
+    }
+    
+    # Cargamos la config del .yaml
+    try:
+        req_algoritmo = config["hardening"]["encryption"]["algoritmo"]
+        comp_luks = config["hardening"]["encryption"]["comp_luks"]
+        critical_mounts = config["hardening"]["encryption"]["critical_mounts"]
+    except KeyError:
+        print("     [ERROR] No se ha encontrado la configuración de cifrado en config.yaml")
+        req_algoritmo = "sha256"
+        comp_luks = True
+        critical_mounts = ["/", "/home", "/var"]
+        
+    
+    query = '''
+        SELECT m.device, m.device_alias, m.path, m.type, de.encryption_status, de.encrypted
+        FROM mounts m
+        LEFT JOIN disk_encryption de ON de.name = m.device_alias
+        WHERE m.device LIKE '/dev/%' AND m.device NOT LIKE '/dev/loop%'
+        ORDER BY m.device;
+    '''
+    res_consulta = ejecutar_consulta(query)
+    tot_particiones = 0
+    tot_cifradas = 0
+    
+    # Listas para llevar la cuenta de los montajes críticos del YAML
+    criticos_encontrados = []
+    criticos_cifrados = []
+    
+    if res_consulta:
+        for linea in res_consulta:
+            tot_particiones += 1
+            dispositivo = linea.get('device_alias', '')
+            ruta = linea.get('path', '')
+            
+            # Comprobamos si la ruta es una de las marcadas en el .yaml
+            if ruta in critical_mounts:
+                criticos_encontrados.append(ruta)
+            
+            # Comprobamos si la partición está cifrada (se indica en 2 campos)
+            if (str(linea.get('encrypted', '0')) == '1') or (str(linea.get('encryption_status', '')) == 'encrypted'):
+                tot_cifradas += 1
+                if ruta in critical_mounts:
+                    criticos_cifrados.append(ruta)
+                    
+                algoritmo = "desconocido"
+                
+                    # Vamos a tratar de obtener el algoritmo usado para el cifrado de la partición
+                try:
+                    res_crypt = subprocess.run(["cryptsetup", "status", dispositivo], capture_output=True, text=True)
+                    if res_crypt.returncode == 0:
+                        for l in res_crypt.stdout.splitlines():
+                            if "cipher:" in l.lower():
+                                algoritmo = l.split(":")[1].strip()
+                except Exception:
+                    pass
+                
+                # Comprobamos si usa el algo de cifrado especificado en el .yaml                
+                advertencia_algo = ""
+                if (req_algoritmo.lower() not in algoritmo.lower()) and (algoritmo != "desconocido"):
+                    advertencia_algo ="(Usa "+algoritmo+", se recomienda "+req_algoritmo+")"
+                    resultados["alertas"].append("El dispositivo "+dispositivo+" no usa el algoritmo recomendado: "+algoritmo)
+
+                
+                # Completamos el campo detalles con la info obtenida
+                detalle = "El dispositivo "+str(dispositivo)+" tiene una partición cifrada con punto de montaje en "+str(ruta)+" usando el algoritmo '"+str(algoritmo)+"'"+advertencia_algo
+                resultados["detalles"].append(detalle)
+                if (advertencia_algo != "") and verbose:
+                    print("     [V] "+str(detalle))
+                else: 
+                    print("     [!] "+str(resultados["alertas"][-1]))
+        
+        
+            # En el caso de que la partición no esté cifrada
+            else:
+                alerta = "El dispositivo "+str(dispositivo)+" tiene una partición sin cifrar con punto de montaje en "+str(ruta)
+                resultados["alertas"].append(alerta)
+                if verbose:
+                    print("     [X] "+str(alerta))
+     
+     
+                    
+    ######################## Catalogamos los resultados ######################################################################################
+    
+    # Sacamos las particiones críticas que existen en el sistema pero no están cifrados
+    criticos_vulnerables = [m for m in criticos_encontrados if m not in criticos_cifrados]
+    
+    if tot_particiones == 0:
+        resultados["alertas"].append("No se detectaron particiones físicas válidas para auditar.")
+        if verbose: print("     [!] No se detectaron particiones físicas válidas.")
+        
+    # Si no hay críticos vulnerables y hemos encontrado al menos uno crítico, es SEGURO
+    elif len(criticos_vulnerables) == 0 and len(criticos_encontrados) > 0:
+        resultados["estado"] = "SEGURO"
+        resumen = f"Todos los montajes críticos detectados ({', '.join(criticos_encontrados)}) están cifrados."
+        resultados["detalles"].append(resumen)
+        if verbose: print("     [V] " + resumen)
+        
+    else:
+        # Falla si falta algún crítico por cifrar o si no hay ninguno cifrado
+        alerta_peligro = "Falta cifrado en puntos de montaje críticos: " + ", ".join(criticos_vulnerables) if criticos_vulnerables else f"Ninguna de las {tot_particiones} particiones físicas está cifrada."
+        resultados["alertas"].append(alerta_peligro)
+        if verbose: print("     [X] PELIGRO: " + alerta_peligro)
+        
+    
+    return resultados
+
+
+
+        
+
+
+
+
+
+
+
+
+
+#################################################################################################################################
 def ESCANER_hardening(verbose):
     datos_reporte = {
         "archivos_criticos": [],

@@ -3,11 +3,13 @@ from modules.system import ESCANEO_info_Simple
 from modules.vulns import ESCANER_vulnerabilidades
 from modules.integrity import ESCANEO_integridad, generar_baseline
 from modules.users import ESCANER_usuarios
-from modules.hardening import 
+import modules.hardening as mHardenind
+
 def escaneo_baseline():
     generar_baseline()
     
 def escaneo_normal(verbose):
+    '''
     datos_reporte = {
         "sistema": {},  
         "paquetes": {}, 
@@ -32,6 +34,15 @@ def escaneo_normal(verbose):
     datos_reporte["politicas_contra"] = usu.get("politicas")
     datos_reporte["usuarios"] = usu.get("usuarios")
     datos_reporte["2FA"] = usu.get("2FA")
+   
+    datos = mHardenind.auditar_suid_sgid(verbose)
     
-    datos = 
+    datos = mHardenind.auditar_archivos_criticos(verbose)
+    
+    datos = mHardenind.auditar_kernel_aslr(verbose)
+     
+    d = mHardenind.auditar_mac(verbose)
+    d = mHardenind.auditar_firewall(verbose)
+    '''
+    d = mHardenind.auditar_cifrado(verbose)
     

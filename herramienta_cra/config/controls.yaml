@@ -106,12 +106,9 @@ hardening:
     private_keys_path: "/etc/ssl/private/"
     max_key_permissions: "600"
 
-
-# (Anexo I.1.4 - Confidencialidad)
-encryption: 
-  algoritmo: "sha256"
-  comp_luks: true
-  critical_mounts: ["/", "/home", "/var"]
+  encryption: 
+    algoritmo: "sha256"
+    critical_mounts: ["/", "/home", "/var"]
 
 
 # (Anexo I.1.5 - Resiliencia)
