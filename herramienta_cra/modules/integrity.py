@@ -39,7 +39,7 @@ def calcular_integridad(ruta):
 def generar_baseline():
     print("[+] Iniciando recopilación de hashes críticos")
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['system']['critical_files']]
+    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
     binarios = config['integrity']['monitored_binaries']
     configs_int = config['integrity']['monitored_configs']
     todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))
@@ -83,7 +83,7 @@ def verificar_integridad(verbose):
     print("[+] Iniciando módulo de integridad")
     
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['system']['critical_files']]
+    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
     binarios = config['integrity']['monitored_binaries']
     configs_int = config['integrity']['monitored_configs']
     todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))

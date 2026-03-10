@@ -9,7 +9,7 @@ def escaneo_baseline():
     generar_baseline()
     
 def escaneo_normal(verbose):
-    '''
+    
     datos_reporte = {
         "sistema": {},  
         "paquetes": {}, 
@@ -39,10 +39,9 @@ def escaneo_normal(verbose):
     
     datos = mHardenind.auditar_archivos_criticos(verbose)
     
-    datos = mHardenind.auditar_kernel_aslr(verbose)
+    datos = mHardenind.auditar_aslr(verbose)
      
     d = mHardenind.auditar_mac(verbose)
     d = mHardenind.auditar_firewall(verbose)
-    '''
     d = mHardenind.auditar_cifrado(verbose)
     

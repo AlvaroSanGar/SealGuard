@@ -4,7 +4,7 @@ from config.settings import config
 
 
 def auditar_suid_sgid(verbose):
-    print(" [+] Buscando binarios peligrosos (SUID/SGID)...")
+    print("[+] Buscando binarios peligrosos (SUID/SGID)...")
     resultados = {
         "seguros": 0,
         "peligrosos": []
@@ -59,7 +59,7 @@ def auditar_suid_sgid(verbose):
 #########################################################################################################
 
 def auditar_archivos_criticos(verbose):
-    print(" [+] Auditando permisos y propietarios de archivos críticos")
+    print("[+] Auditando permisos y propietarios de archivos críticos")
     # Cargamos datos e inicializamos variables
     archivos_yaml = config["hardening"]["critical_files"]
     resultados =[]
@@ -193,7 +193,7 @@ def auditar_ssh(verbose):
 
 #########################################################################################################################################################
 def auditar_firewall(verbose):
-    print(" [+] Comprobando el estado del Firewall")
+    print("[+] Comprobando el estado del Firewall")
     
     resultado = {
         "estado": "PELIGROSO",
@@ -338,7 +338,7 @@ def auditar_firewall(verbose):
     # Solo alertamos si el firewall está activo o hay reglas, porque si está apagado ya lo hemos dicho arriba.
     if reglas_bloqueo > 0 or len(servicios_activos) > 0:
         if politica_accept:
-            alerta_pol = "El firewall tiene políticas por defecto permisivas (ACCEPT). Se recomienda un enfoque 'Default Deny'"
+            alerta_pol = "El firewall tiene políticas por defecto permisivas (ACCEPT). Se recomienda 'Default Deny'"
             resultado["alertas"].append(alerta_pol)
             if verbose:
                 print("     [!] " + alerta_pol)
@@ -350,7 +350,7 @@ def auditar_firewall(verbose):
                 print("     [!] " + alerta_out)
                 
         if not bloqueo_forward:
-            alerta_fwd = "No se han detectado reglas de bloqueo en la cadena FORWARD. Riesgo de enrutamiento no deseado"
+            alerta_fwd = "No se han detectado reglas de bloqueo en la cadena FORWARD"
             resultado["alertas"].append(alerta_fwd)
             if verbose:
                 print("     [!] " + alerta_fwd)
@@ -372,7 +372,7 @@ def auditar_firewall(verbose):
 
 #######################################################################################################################
 def auditar_aslr(verbose):
-    print(" [+] Comprobando si ASLR en el Kernel")
+    print("[+] Comprobando si ASLR en el Kernel")
     resultado = {
         "estado": "PELIGROSO",
         "valor": 0,
@@ -401,7 +401,7 @@ def auditar_aslr(verbose):
                 
         case _:
             if verbose:
-                print("     [X] El kernel no tinene activadas las protecciones por ASLR, por favor revise su configuración del sistema")
+                print("     [X] El kernel no tinene activadas las protecciones por ASLR")
     
     return resultado
 
@@ -417,7 +417,7 @@ def auditar_aslr(verbose):
 
 #################################################################################################################################
 def auditar_mac(verbose):
-    print(" [+] Comprobando Control de Acceso Obligatorio (AppArmor/SELinux)...")
+    print("[+] Comprobando Control de Acceso Obligatorio (AppArmor/SELinux)...")
     resultado = {
         "estado": "PELIGROSO",
         "mac_activo": None,
@@ -491,7 +491,7 @@ def auditar_mac(verbose):
                 seguro = True # Ponemos seguro a True para que no salte el print final de error
                 
             elif valor_selinux == "0":
-                alerta = "ATENCIÓN: SELinux está en modo 'permissive' (Solo avisa, no bloquea)"
+                alerta = "SELinux está en modo 'permissive' (Solo avisa, no bloquea)"
                 resultado["alertas"].append(alerta)
                 if verbose:
                     print("     [!] " + alerta)
@@ -527,7 +527,7 @@ def auditar_certificados():
 
 #################################################################################################################################
 def auditar_cifrado(verbose):
-    print(" [+] Comprobando el cifrado de discos (LUKS/FDE)...")
+    print("[+] Comprobando el cifrado de discos (LUKS/FDE)...")
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
@@ -537,12 +537,10 @@ def auditar_cifrado(verbose):
     # Cargamos la config del .yaml
     try:
         req_algoritmo = config["hardening"]["encryption"]["algoritmo"]
-        comp_luks = config["hardening"]["encryption"]["comp_luks"]
         critical_mounts = config["hardening"]["encryption"]["critical_mounts"]
     except KeyError:
         print("     [ERROR] No se ha encontrado la configuración de cifrado en config.yaml")
         req_algoritmo = "sha256"
-        comp_luks = True
         critical_mounts = ["/", "/home", "/var"]
         
     
