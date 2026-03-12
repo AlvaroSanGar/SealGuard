@@ -86,9 +86,15 @@ hardening:
     forviden_permissions: ["2", "3", "6", "7"] # w, wx, rw, rwx
 
   ssh:
-    permit_root_login: ["no", "prohibit-password"]
-    password_authentication: "no"
-    protocol: "2"
+    secure_params:
+      PermitRootLogin: "no"
+      PermitEmptyPasswords: "no"
+      PasswordAuthentication: "no"  # Obligamos a usar claves 
+      MaxAuthTries: "4"             # Corta la conexión rápido si fallan
+      MaxSessions: "2"
+
+    allowed_users:
+      - "usu_prueba@10.0.2.8"
 
   firewall_services:
     - "ufw.service"
@@ -101,10 +107,15 @@ hardening:
     check_aslr: true
     check_mac: true # AppArmor / SELinux
 
-  certificates:
-    check_expiration_days: 30
-    private_keys_path: "/etc/ssl/private/"
-    max_key_permissions: "600"
+  certificados:
+    dias_aviso_caducidad: 30
+    min_rsa_key_size: 2048
+    algoritmos_permitidos: 
+      - "sha256WithRSAEncryption"
+      - "sha384WithRSAEncryption"
+      - "sha512WithRSAEncryption"
+      - "ecdsa-with-SHA256"
+      - "ecdsa-with-SHA384"
 
   encryption: 
     algoritmo: "sha256"

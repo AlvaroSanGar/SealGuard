@@ -1,10 +1,15 @@
+import os
+import stat
+import pwd
+import time
 import subprocess
+import re
 from modules.system import ejecutar_consulta
 from config.settings import config
 
 
 def auditar_suid_sgid(verbose):
-    print("[+] Buscando binarios peligrosos (SUID/SGID)...")
+    print("[+] Buscando binarios peligrosos (SUID/SGID)")
     resultados = {
         "seguros": 0,
         "peligrosos": []
@@ -22,12 +27,10 @@ def auditar_suid_sgid(verbose):
         ruta = proceso.get("path")
         permisos = proceso.get("mode")
         
-        # Comprobamos si en algún trozo de la ruta (substring) hay un directorio crítico/vulnerable
         vulnerable_dir = any(directorio in ruta for directorio in critical_dir)
         
-        # Comprobamos directamente si se cumple que el archivo tiene permisos (por si acaso pero debería) y acto seguido si los permisos del
-        # grupo "otros" (dueño-grupo-otros) está en critical_per (obtenemos dichos permisos con permisos[-1])
-        if ((permisos and (permisos[-1] in critical_per)) or vulnerable_dir):
+        # Miramos los permisos otros [-1] y de grupo [-2]
+        if permisos and len(permisos) >= 3 and (permisos[-1] in critical_per or permisos[-2] in critical_per) or vulnerable_dir:
             resultados["peligrosos"].append(proceso)
             if verbose and vulnerable_dir:
                 print("     [X] Se ha detectado un proceso con el bit SUID/GUID activo en: "+str(proceso["path"]))
@@ -88,7 +91,7 @@ def auditar_archivos_criticos(verbose):
         
         # Obtenemos los valores de cada archivo real obtenido con OSquery
         permisos_esp = archivo_esp.get("max_permissions")
-        dueño_esp = archivo_esp.get("owner")
+        dueno_esp = archivo_esp.get("owner") 
         archivo = archivo_esp.get("path")
         
         archivo_obt = None
@@ -111,17 +114,18 @@ def auditar_archivos_criticos(verbose):
         problemas = []
         
         # Comprobamos si el owner coincide
-        if dueño_esp != archivo_obt.get("username"):
-            problemas.append("El dueño esperado es "+str(dueño_esp)+" pero en su lugar, el dueño del archivo es "+str(archivo_obt.get('owner')))
+        if dueno_esp != archivo_obt.get("username"): 
+            problemas.append("El dueño esperado es "+str(dueno_esp)+" pero en su lugar, el dueño del archivo es "+str(archivo_obt.get('username'))) # [MODIFICADO]: Era 'owner', es 'username'
         
         # Comprobamos si los permisos son menores a los indicados por config
         permisos_reales = archivo_obt.get("mode", "")
         permisos_limpios = permisos_reales[-3:] if len(permisos_reales) >= 3 else permisos_reales # Osquery devuelve un 0 o 1 delante para indicar el suid
         
         try:
-            # Convertimos ambos strings a base 8 (octal) para compararlos matemáticamente
-            if int(permisos_limpios, 8) > int(permisos_esp, 8):
-                problemas.append("Los permisos actuales ("+str(permisos_limpios)+") son más permisivos que el máximo tolerado ("+str(permisos_esp)+")")
+            perm_actual = int(permisos_limpios, 8)
+            perm_max = int(permisos_esp, 8)
+            if (perm_actual & ~perm_max) != 0: # Igual que en certificados
+                problemas.append("Los permisos actuales ("+str(oct(perm_actual))+") son más permisivos que el máximo tolerado (0o"+str(permisos_esp)+")")
                 
         except TypeError:
             problemas.append("No se ha definido el permiso máximo en el archivo YAML para este archivo.")
@@ -165,14 +169,125 @@ def auditar_archivos_criticos(verbose):
 ###################################################################################################################################
 
 def auditar_ssh(verbose):
-    print(" [+] Auditando configuración de seguridad SSH...")
-    ssh_yaml = config["hardening"]["ssh"]
-    reporte_ssh = {}
+    print("[+] Auditando configuración de seguridad SSH")
+    resultados =  {
+        "estado": "PELIGROSO",
+        "detalles": [],
+        "alertas": []
+    }
     
-    # Aquí reutilizaremos tu función de buscar en /etc/ssh/sshd_config
-    # para ver si root puede hacer login o si se permiten contraseñas.
+    # Cargamos los datos del .yaml
+    try:
+        ssh_params = config["hardening"]["ssh"]["secure_params"]
+        ssh_usu = config["hardening"]["ssh"]["allowed_users"]
     
-    return reporte_ssh
+    except Exception:
+        ssh_params = {'PermitRootLogin': 'no', 'PermitEmptyPasswords': 'no', 'PasswordAuthentication': 'no', 'MaxAuthTries': '4', 'MaxSessions': '2'}
+        ssh_usu = None
+        
+        
+        
+    # Comprobamos si ssh está instalado, en caso de que no lo esté marcamos el servicio como seguro
+    if not os.path.exists('/etc/ssh/sshd_config'):
+        resultados["estado"] = "SEGURO"
+        resultados["detalles"] = "El servicio ssh no está instalado en el sistema, por lo que no puede ser vulnerable"
+        if verbose:
+            print("     [i] "+str(resultados.get("detalles")))
+        return resultados
+
+
+
+    # Obtenemos el archivo ssh y lo leemos en busqueda de los parametros de config indicados en el .yaml
+    contenido_ssh = {}
+    try:
+        with open('/etc/ssh/sshd_config', "r") as f:
+            for linea in f:
+                linea = linea.strip()
+                # Ignoramos líneas vacías o comentadas
+                if not linea or linea.startswith("#"):
+                    continue
+                
+                # Separamos clave y valor
+                partes = linea.split()
+                if len(partes) >= 2:
+                    clave = partes[0]
+                    valor = " ".join(partes[1:]) # Por si el valor tiene espacios
+                    contenido_ssh[clave] = valor
+    except Exception as e:
+        print("     [ERROR] Fallo al leer '/etc/ssh/sshd_config': "+str(e))
+        resultados["alertas"] = "No se ha logrado leer el archivo de configuración"
+        return resultados
+    
+    
+    # Comprobamos para cada valor de ssh_params si está en la configuración del servicio ssh
+    for atributo in ssh_params:
+        if atributo in contenido_ssh:   
+            # En caso de que esté comprobamos si tiene el mismo valor
+            if contenido_ssh[atributo].lower() == ssh_params[atributo].lower():
+                detalle = 'El parametro '+str(atributo)+' cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
+                resultados["detalles"].append(detalle)
+                if verbose:
+                    print("     [V] "+str(detalle))
+            
+            # En caso de que no tenga el mismo valor lo indicamos
+            else:
+                alerta = 'El parametro '+str(atributo)+' no cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
+                resultados["alertas"].append(alerta)
+                if verbose:
+                    print("     [X] "+str(alerta))
+        
+        # Si no aparece en la configuración lo indicamos
+        else:
+            alerta = 'El parametro '+str(atributo)+' no está configurado en el servicio ssh'
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [!] "+str(alerta))
+                
+                
+    # Comprobamos que no se ejecuta en el puerto 22 (para evitar ataques de bots)
+    if contenido_ssh.get("Port", "22") == "22":
+        alerta = 'El puerto en el que se está ejecutando SSH es por defecto (22), es vulnerable a ataques de bots automatizados'
+        resultados["alertas"].append(alerta)
+        if verbose:
+            print("     [X] "+str(alerta))
+        
+    else: # En caso de que no se ejecute en el p22
+        detalle = 'El servicio se está ejecutando en el puerto '+str(contenido_ssh.get("Port"))
+        resultados["detalles"].append(detalle)
+        if verbose:
+            print("     [V] "+str(detalle))
+    
+    
+    ##################### Comprobamos los usuarios
+    if ssh_usu:
+        usuarios_actuales_str = contenido_ssh.get("AllowUsers", "")
+        lista_actuales = usuarios_actuales_str.split() # Lo convertimos en lista separando por espacios
+        
+        # Comprobamos si coinciden exactamente (ni faltan ni sobran usuarios)
+        faltan = [u for u in ssh_usu if u not in lista_actuales]
+        sobran = [u for u in lista_actuales if u not in ssh_usu]
+        
+        if not faltan and not sobran and usuarios_actuales_str:
+            detalle = 'La directiva AllowUsers coincide exactamente con los usuarios permitidos en la política.'
+            resultados["detalles"].append(detalle)
+            if verbose:
+                print("     [V] " + str(detalle))
+        else:
+            alerta = 'La lista de usuarios permitidos (AllowUsers) no coincide. Esperado: ' + " ".join(ssh_usu) + ' | Actual: ' + usuarios_actuales_str
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [X] " + str(alerta))
+    
+    
+    # Catalogamos el resultado final
+    if len(resultados["alertas"]) == 0:
+        resultados["estado"] = 'SEGURO'
+        if verbose:
+            print("     [V] Se cumplen todas las políticas de seguridad en ssh")
+    elif verbose:
+        print("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
+    
+    return resultados
 
 
 
@@ -330,9 +445,9 @@ def auditar_firewall(verbose):
     
     # No hay ni firewall ni reglas
     else:
-        resultado["alertas"].append('No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encentra expuesto a la red')
+        resultado["alertas"].append('No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
         if verbose:
-            print('     [X] No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encentra expuesto a la red')
+            print('     [X] No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
             
     ############## Alertas extra ####################################################################################
     # Solo alertamos si el firewall está activo o hay reglas, porque si está apagado ya lo hemos dicho arriba.
@@ -509,8 +624,191 @@ def auditar_mac(verbose):
 
 
 ##################################################################################################################################
-def auditar_certificados():
-    resultados = {}
+def auditar_certificados(verbose):
+    print("[+] Comprobando Certificados y Claves")
+    resultados = {
+        "estado": "PELIGROSO",
+        "detalles": [],
+        "alertas": []
+    }
+    
+    #Obtenemos la info  de settings.yaml 
+    try:
+        cert_config = config["hardening"]["certificados"]
+        dias_aviso = cert_config["dias_aviso_caducidad"]
+        min_rsa = cert_config["min_rsa_key_size"]
+        algoritmos_permitidos = cert_config["algoritmos_permitidos"]
+        rutas_criticas = cert_config["rutas_criticas"]
+    
+    except Exception:
+        dias_aviso = 30
+        min_rsa = 2048
+        algoritmos_permitidos = ["sha256WithRSAEncryption", "sha384WithRSAEncryption", "sha512WithRSAEncryption", "ecdsa-with-SHA256", "ecdsa-with-SHA384"]
+        rutas_criticas = []
+
+    # En caso de que no se hayan definido rutas, lo marcamos como seguro, a que no hay certificados
+    if not rutas_criticas:
+        resultados["estado"] = "SEGURO"
+        resultados["detalles"] = "No hay rutas críticas de certificados definidas para auditar"
+        if verbose:
+            print("     [i] "+str(resultados["detalles"]))
+        return resultados
+
+
+    #################### Comprobamos los permisos ###################################################
+    for archivo in rutas_criticas:
+        ruta = archivo.get("path")
+        tipo = archivo.get("tipo")
+        max_permisos_esp = archivo.get("max_permissions")
+        dueno_esp = archivo.get("owner")
+
+        # Comprobamos si el archivo existe realmente
+        if not os.path.exists(ruta):
+            alerta = "No se encuentra el hash: "+str(ruta)
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [!] "+str(alerta))
+            continue
+
+        file_stat = os.stat(ruta) # Guardamos todos los metadatos del archivo ()
+        
+        
+        # Comprobamos el propietario del archivo
+        try:
+            dueno_actu = pwd.getpwuid(file_stat.st_uid).pw_name # [MODIFICADO]: Cambiada ñ por n
+            if dueno_actu != dueno_esp:
+                alerta = "El archivo "+str(ruta)+" no tiene el dueño esperado. Actual: "+str(dueno_actu)+" | Esperado: "+str(dueno_esp)
+                resultados["alertas"].append(alerta)
+                if verbose:
+                    print("     [X] "+str(alerta))
+        except KeyError:
+            pass 
+            
+            
+        # Comprobamos los permisos (usamos operadores a nivel de bits para validar el máximo permitido)
+        perm_actual = stat.S_IMODE(file_stat.st_mode) # Deja los bits limpios de permisos (sin tipo de archivo)
+        perm_max = int(max_permisos_esp, 8) # De formato string a octal
+        
+        # Comprobación a nivel de bits, calculamos el inverso de los bits de los permisos max (donde hay un 0 ponemos un 1 y al revés)
+        # Y aplicamos el operador AND entre los permisos de archivo y el inverso del máximo, de esa forma si hay algún bit que represente un permiso excesivo
+        # el resultado de la operación será distinto de 0
+        if (perm_actual & ~perm_max) != 0: 
+            alerta = "El archivo "+str(ruta)+" tiene permisos excesivos. Actual: "+str(oct(perm_actual))+" | Máximo permitido: 0o"+str(max_permisos_esp)
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [X] "+str(alerta))
+        else:
+            detalle = "El archivo "+str(ruta)+" tiene los permisos y propietario correctos"
+            resultados["detalles"].append(detalle)
+            if verbose:
+                print("     [V] "+str(detalle))
+
+        # Si el archivo es una clave privada, pasamos al siguiente 
+        if tipo == "privado":
+            continue
+
+
+        #################### Evaluamos el contenido criptográfico (solo públicos) ########################
+        query = "SELECT not_valid_after, signing_algorithm, issuer, subject FROM certificates WHERE path = '"+str(ruta)+"';"
+        res_osquery = ejecutar_consulta(query) # Asegúrate de que usas tu función de DB correspondiente
+
+        if res_osquery:
+            datos = res_osquery[0]
+            
+            ################# Comprobamos la caducidad #######################################################
+            try:
+                # Calculamos el número de días que quedan hasta que caduque el certificado
+                timestamp_caducidad = int(datos.get("not_valid_after", 0))
+                dias_restantes = int((timestamp_caducidad - time.time()) / 86400)
+                
+                # Caso de que ya haya caducado
+                if dias_restantes < 0:
+                    alerta = "El certificado "+str(ruta)+" ha caducado hace "+str(abs(dias_restantes))+" días"
+                    resultados["alertas"].append(alerta)
+                    if verbose:
+                        print("     [X] "+str(alerta))
+                        
+                # Caso de que falte poco para que caduque 
+                elif dias_restantes <= dias_aviso:
+                    alerta = "El certificado "+str(ruta)+" caduca pronto (en "+str(dias_restantes)+" días)"
+                    resultados["alertas"].append(alerta)
+                    if verbose:
+                        print("     [!] "+str(alerta))
+                        
+                # Caso de que aún quede tiempo
+                else:
+                    detalle = "El certificado "+str(ruta)+" está en vigor. Caduca en "+str(dias_restantes)+" días"
+                    resultados["detalles"].append(detalle)
+                    if verbose:
+                        print("     [V] "+str(detalle))
+                        
+            except Exception:
+                pass
+
+            ############ Comparamos el algoritmo con la white_list ############################################
+            algo_actual = datos.get("signing_algorithm", "")
+            if algo_actual not in algoritmos_permitidos:
+                alerta = "El certificado "+str(ruta)+" usa un algoritmo no permitido: "+str(algo_actual)
+                resultados["alertas"].append(alerta)
+                if verbose:
+                    print("     [X] "+str(alerta))
+            else:
+                detalle = "El certificado "+str(ruta)+" usa un algoritmo seguro ("+str(algo_actual)+")"
+                resultados["detalles"].append(detalle)
+                if verbose:
+                    print("     [V] "+str(detalle))
+
+
+            ################ Verificamos si es autofirmado ########################################################
+            if datos.get("issuer") == datos.get("subject"):
+                alerta = "El certificado "+str(ruta)+" está AUTOFIRMADO (Peligro en producción)"
+                resultados["alertas"].append(alerta)
+                if verbose:
+                    print("     [!] "+str(alerta))
+
+        # Consultamos el tamaño de la clave y el EKU ejecutando openssl
+        try:
+            res_ssl = subprocess.run(['openssl', 'x509', '-in', ruta, '-text', '-noout'], capture_output=True, text=True)
+            if res_ssl.returncode == 0:
+                salida_ssl = res_ssl.stdout
+                
+                # Obtenemos el tamaño de la clave con una expresión regular
+                match_size = re.search(r'Public-Key: \((\d+) bit\)', salida_ssl)
+                if match_size:
+                    tamano = int(match_size.group(1))
+                    if tamano < min_rsa:
+                        alerta = "El certificado "+str(ruta)+" tiene una clave insuficiente: "+str(tamano)+" bits (Min: "+str(min_rsa)+")"
+                        resultados["alertas"].append(alerta)
+                        if verbose:
+                            print("     [X] "+str(alerta))
+                    else:
+                        detalle = "El tamaño de la clave del certificado "+str(ruta)+" es robusto ("+str(tamano)+" bits)"
+                        resultados["detalles"].append(detalle)
+                        if verbose:
+                            print("     [V] "+str(detalle))
+
+                # Obtenemos el permiso EKU
+                if "TLS Web Server Authentication" not in salida_ssl:
+                    alerta = "El certificado "+str(ruta)+" no tiene el permiso 'Server Authentication'"
+                    resultados["alertas"].append(alerta)
+                    if verbose:
+                        print("     [X] "+str(alerta))
+                else:
+                    detalle = "El certificado "+str(ruta)+" tiene el propósito 'Server Authentication' válido"
+                    resultados["detalles"].append(detalle)
+                    if verbose:
+                        print("     [V] "+str(detalle))
+        except Exception:
+            pass
+
+
+    #################### Catalogamos el resultado final ############################################
+    if len(resultados["alertas"]) == 0:
+        resultados["estado"] = 'SEGURO'
+        if verbose:
+            print("     [V] Se cumplen todas las políticas de seguridad en certificados")
+    elif verbose:
+        print("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
     
     return resultados
 
@@ -577,7 +875,7 @@ def auditar_cifrado(verbose):
                     
                 algoritmo = "desconocido"
                 
-                    # Vamos a tratar de obtener el algoritmo usado para el cifrado de la partición
+                # Vamos a tratar de obtener el algoritmo usado para el cifrado de la partición
                 try:
                     res_crypt = subprocess.run(["cryptsetup", "status", dispositivo], capture_output=True, text=True)
                     if res_crypt.returncode == 0:
@@ -590,17 +888,18 @@ def auditar_cifrado(verbose):
                 # Comprobamos si usa el algo de cifrado especificado en el .yaml                
                 advertencia_algo = ""
                 if (req_algoritmo.lower() not in algoritmo.lower()) and (algoritmo != "desconocido"):
-                    advertencia_algo ="(Usa "+algoritmo+", se recomienda "+req_algoritmo+")"
+                    advertencia_algo =" (Usa "+algoritmo+", se recomienda "+req_algoritmo+")"
                     resultados["alertas"].append("El dispositivo "+dispositivo+" no usa el algoritmo recomendado: "+algoritmo)
 
                 
                 # Completamos el campo detalles con la info obtenida
                 detalle = "El dispositivo "+str(dispositivo)+" tiene una partición cifrada con punto de montaje en "+str(ruta)+" usando el algoritmo '"+str(algoritmo)+"'"+advertencia_algo
                 resultados["detalles"].append(detalle)
-                if (advertencia_algo != "") and verbose:
+                
+                if advertencia_algo != "" and verbose:
+                    print("     [!] "+str(detalle))
+                elif verbose: 
                     print("     [V] "+str(detalle))
-                else: 
-                    print("     [!] "+str(resultados["alertas"][-1]))
         
         
             # En el caso de que la partición no esté cifrada
@@ -657,29 +956,22 @@ def ESCANER_hardening(verbose):
         "firewall": {},
         "suid_sgid": [],
         "kernel_aslr": {},
-        "mac": {}
+        "mac": {},
+        "certificados": {},
+        "cifrado": {}
     }
 
-    print("\n--- [ FASE 5: BASTIONADO DEL SISTEMA (HARDENING) ] ---")
+    print("\n--- [ FASE 5: HARDENING DEL SISTEMA ] ---")
     
-    # 1. Permisos y Archivos
+    datos_reporte["suid_sgid"] = auditar_suid_sgid(verbose)
     datos_reporte["archivos_criticos"] = auditar_archivos_criticos(verbose)
-    
-    # 2. Servicios de Red
     datos_reporte["ssh"] = auditar_ssh(verbose)
-    if config["hardening"]["firewall"]["check_active"]:
-        datos_reporte["firewall"] = auditar_firewall(verbose)
-    
-    # 3. Protecciones de Sistema Operativo
-    if config["hardening"]["system_checks"]["check_suid_sgid"]:
-        datos_reporte["suid_sgid"] = auditar_suid_sgid(verbose)
-        
-    if config["hardening"]["system_checks"]["check_aslr"]:
-        datos_reporte["kernel_aslr"] = auditar_aslr(verbose)
-        
-    if config["hardening"]["system_checks"]["check_mac"]:
-        datos_reporte["mac"] = auditar_mac(verbose)
+    datos_reporte["firewall"] = auditar_firewall(verbose)
+    datos_reporte["kernel_aslr"] = auditar_aslr(verbose)
+    datos_reporte["mac"] = auditar_mac(verbose)
+    datos_reporte["certificados"] = auditar_certificados(verbose)
+    datos_reporte["cifrado"] = auditar_cifrado(verbose)
 
-    print("[-] Finalizando módulo de bastionado")
+    print("[-] Finalizando módulo de hardening")
     
     return datos_reporte
