@@ -64,8 +64,23 @@ def auditar_suid_sgid(verbose):
 def auditar_archivos_criticos(verbose):
     print("[+] Auditando permisos y propietarios de archivos críticos")
     # Cargamos datos e inicializamos variables
-    archivos_yaml = config["hardening"]["critical_files"]
-    resultados =[]
+    try:
+        archivos_yaml = config["hardening"]["critical_files"]
+    except KeyError:
+        # Si borran la sección entera en el YAML, creamos una lista vacía
+        archivos_yaml = [] 
+        
+    resultados = []
+
+    # Extraemos solo las rutas que haya puesto el usuario para comprobar
+    rutas_existentes = [archivo.get("path") for archivo in archivos_yaml]    
+    # Si el archivo del GRUB no está, lo forzamos metiéndolo en la lista
+    if "/etc/default/grub" not in rutas_existentes:
+        archivos_yaml.append({
+            "path": "/etc/default/grub",
+            "max_permissions": "600",
+            "owner": "root"
+        })
     
     # Cargamos las rutas para poder ponerlas en formato SQL
     archivos_criticos = []
@@ -89,7 +104,7 @@ def auditar_archivos_criticos(verbose):
             "problemas": []
         }
         
-        # Obtenemos los valores de cada archivo real obtenido con OSquery
+        # Obtenemos los valores de cada archivo esperado
         permisos_esp = archivo_esp.get("max_permissions")
         dueno_esp = archivo_esp.get("owner") 
         archivo = archivo_esp.get("path")
@@ -115,7 +130,7 @@ def auditar_archivos_criticos(verbose):
         
         # Comprobamos si el owner coincide
         if dueno_esp != archivo_obt.get("username"): 
-            problemas.append("El dueño esperado es "+str(dueno_esp)+" pero en su lugar, el dueño del archivo es "+str(archivo_obt.get('username'))) # [MODIFICADO]: Era 'owner', es 'username'
+            problemas.append("El dueño esperado es "+str(dueno_esp)+" pero en su lugar, el dueño del archivo es "+str(archivo_obt.get('username'))) 
         
         # Comprobamos si los permisos son menores a los indicados por config
         permisos_reales = archivo_obt.get("mode", "")
@@ -140,7 +155,8 @@ def auditar_archivos_criticos(verbose):
             formato["problemas"] = problemas
             resultados.append(formato)
             if verbose:
-                print("     [X] El archivo "+str(archivo)+" no cumple los requisitos de seguridad establecidos | Fallos de seguridad detectados:")
+                print("     [X] El archivo "+str(archivo)+" no cumple los requisitos de seguridad establecidos ")
+                print("         | Fallos de seguridad detectados:")
                 for p in problemas:
                     print("         - "+str(p))
         
@@ -350,7 +366,7 @@ def auditar_firewall(verbose):
                         if verbose:
                             print("     [!] " + alerta)
                             
-                # Caso de que estéconfigurado para arrancar siempre, pero actualmente está apagado o caído
+                # Caso de que esté configurado para arrancar siempre, pero actualmente está apagado o caído
                 elif estado_arranque == 'enabled' and estado_actu != 'active':
                     alerta = "El gestor '" + nombre + "' debería estar encendido de forma persistente (enabled), pero actualmente está APAGADO."
                     resultado["alertas"].append(alerta)
@@ -675,7 +691,7 @@ def auditar_certificados(verbose):
         
         # Comprobamos el propietario del archivo
         try:
-            dueno_actu = pwd.getpwuid(file_stat.st_uid).pw_name # [MODIFICADO]: Cambiada ñ por n
+            dueno_actu = pwd.getpwuid(file_stat.st_uid).pw_name 
             if dueno_actu != dueno_esp:
                 alerta = "El archivo "+str(ruta)+" no tiene el dueño esperado. Actual: "+str(dueno_actu)+" | Esperado: "+str(dueno_esp)
                 resultados["alertas"].append(alerta)
@@ -962,6 +978,7 @@ def ESCANER_hardening(verbose):
     }
 
     print("\n--- [ FASE 5: HARDENING DEL SISTEMA ] ---")
+    print("[+] Iniciando módulo de hardening")
     
     datos_reporte["suid_sgid"] = auditar_suid_sgid(verbose)
     datos_reporte["archivos_criticos"] = auditar_archivos_criticos(verbose)

@@ -61,24 +61,26 @@ integrity:
     - "/etc/fstab"
 
 
-# (Anexo I.1.4 - Confidencialidad)
-# (Anexo I.1.4 - Confidencialidad y Bastionado)
+
 hardening: 
   critical_files:
     - path: "/etc/shadow"
-      max_permissions: "640" # rw-r-----
+      max_permissions: "640" 
       owner: "root"
     - path: "/etc/passwd"
-      max_permissions: "644" # rw-r--r--
+      max_permissions: "644" 
       owner: "root"
     - path: "/etc/ssh/sshd_config"
-      max_permissions: "600" # rw-------
+      max_permissions: "600" 
       owner: "root"
     - path: "/etc/crontab"
       max_permissions: "644"
       owner: "root"
     - path: "/etc/sudoers" 
       max_permissions: "440"
+      owner: "root"
+    - path: "/etc/default/grub"
+      max_permissions: "600"
       owner: "root"
   
   suid_sgid:
@@ -131,23 +133,59 @@ backups:
 
 
 users:
-    check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
-    disallow_empty_passwords: true
-    max_password_days: 90
-    critical_groups: ["root", "sudo", "adm"]
-    politics: ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
-    mfa:
-      modulos_pam_2fa: 
-        - "pam_google_authenticator.so"
-        - "pam_duo.so"
-        - "pam_yubico.so"
-        - "pam_u2f.so"
+  check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
+  disallow_empty_passwords: true
+  max_password_days: 90
+  critical_groups: ["root", "sudo", "adm"]
+  politics: ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
+  mfa:
+    modulos_pam_2fa: 
+      - "pam_google_authenticator.so"
+      - "pam_duo.so"
+      - "pam_yubico.so"
+      - "pam_u2f.so"
 
-      servicios_pam_a_revisar:
-        - "sshd"
-        - "sudo"
-        - "login"
+    servicios_pam_a_revisar:
+      - "sshd"
+      - "sudo"
+      - "login"
 
-      tokens_requeridos:
-        ".google_authenticator": "pam_google_authenticator.so"
-        ".yubico": "pam_yubico.so"
+    tokens_requeridos:
+      ".google_authenticator": "pam_google_authenticator.so"
+      ".yubico": "pam_yubico.so"
+
+boot:
+  param_kernel:
+    white_list:
+      - ["apparmor=1", "selinux=1", "enforcing=1"]  # Fuerza control de acceso obligatorio
+      - "audit=1"
+      - "slab_nomerage=1"
+      - "page_poison=1"
+    
+    black_list:
+      - ["init=/bin/bash", "init=single", "single"]
+      - "nokaslr"
+      - ["mitigations=off", "nopti"]
+
+  contra_fisica: false
+
+  integridad_kernel:
+    white_list:
+      "P": 0
+      "O": 4096
+
+    warning_list:
+      "W": 512
+      "C": 1024
+      "K": 32768
+
+    black_list:
+      "F": 2
+      "R": 8
+      "D": 128
+      "A": 256
+      "E": 8192
+    
+    modulos_permitidos: ["nvidia"]
+
+
