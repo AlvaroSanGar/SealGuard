@@ -1,8 +1,4 @@
 import os
-import subprocess
-import re
-import stat
-import pwd
 from modules.system import ejecutar_consulta
 from config.settings import config
 
@@ -10,10 +6,11 @@ from config.settings import config
 
 def auditar_integridad_firmware(verbose):
     print("[+] Auditando integridad del firmware y del kernel")
-    reporte_integridad = {
+    resultados = {
         "secure_boot": False,
-        "kernel_tainted": False,
-        "detalles": []
+        "kernel_seguro": False,
+        "detalles": [],
+        "alertas": []
     }
     
     # Cargamos los datos del .yaml
@@ -21,30 +18,120 @@ def auditar_integridad_firmware(verbose):
         white_list = config["boot"]["integridad_kernel"]["white_list"]
         warning_list = config["boot"]["integridad_kernel"]["warning_list"]
         black_list = config["boot"]["integridad_kernel"]["black_list"]
-        modulos_permitidos = config["boot"]["integridad_kernel"]["modulos_permitidos"]
         
     except KeyError:
         print("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
-        white_list = {"P": 0, "O": 4096}
-        warning_list = {"W": 512, "C":1024, "K": 32768}
-        black_list = {"F": 2, "R": 8, "D": 128, "A": 256, "E": 8192}
-        modulos_permitidos = []
+        white_list = [["P", 1], ["O", 4096]]
+        warning_list = [["W", 512], ["C", 1024], ["K", 32768]]
+        black_list = [["F", 2], ["R", 8], ["D", 128], ["A", 256], ["E", 8192]]
         
-
+    ########## Secure Boot ########################################################################################
+    
     # Comprobamos que el Secure Boot está activo con OSquery, (si no obtenemos tabla significa que el sistema arrancó en modo Legacy y no puede tenerlo activo)
     query = 'SELECT secure_boot FROM secureboot;'
     respuesta = ejecutar_consulta(query)
+    # En caso de que la tabla contenga algún registro
     if len(respuesta) > 0:
-        print("Ha entrado")
-    
-    else:
-        print("No ha entrado")
+        resul_SB = respuesta.get('secure_boot')
+        if resul_SB == 1:
+            resultados["secure_boot"] = True
+            detalle = 'El sistema tiene activado Secure Boot con el modo Full-Security'
+            resultados["detalles"].append(str(detalle))
+            if verbose:
+                print("     [V] "+str(detalle))
         
+        elif resul_SB == 2:
+            alerta = 'El sistema tiene activado Secure Boot con el modo Medium-Security, este modo no otorga una protección aceptable'
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [X] "+str(alerta))
+        
+        else:
+            alerta = 'El sistema no tiene activado Secure Boot con el modo Medium-Security'
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [X] "+str(alerta))
     
-    # 2. Aquí leeremos el archivo '/proc/sys/kernel/tainted' para ver si el núcleo
-    #    ha sido corrompido o si está limpio (valor 0).
-    
-    return reporte_integridad
+    # La tabla no tiene registros por lo que está en modo Legacy
+    else:
+        alerta = 'El sistema arranco en modo Legacy, por lo que no tiene Secure Boot'
+        resultados["alertas"].append(alerta)
+        if verbose:
+            print("     [X] "+str(alerta))
+
+    ######## Tainted kernel ##############################################################################
+    query = 'SELECT current_value FROM system_controls WHERE name = "kernel.tainted";'
+    problemas_tai = 0
+    warning_tai = 0
+    respuesta = ejecutar_consulta(query)
+    if len(respuesta) > 0:
+        resul_tai = int(respuesta[0].get('current_value'))
+        
+        # En caso de que no se haya manchado el kernel
+        if resul_tai == 0:
+            resultados["kernel_seguro"] = True
+            detalle = 'El kernel no ha sido alterado en el proceso de boot'
+            resultados["detalles"].append(detalle)
+            if verbose:
+                print("     [V] "+detalle)
+            return resultados
+        
+        # Comprobamos las flags haciendo XOR ya que cada una es una potencia de dos
+        else:
+            for val in (white_list+black_list+warning_list):
+                val_bit = val[1]
+                if resul_tai & val_bit:
+                    # La flag se ha activado en el proceso de boot, sacamos a que proceso pertenece
+                    # White_list
+                    if val in warning_list:
+                        warning_tai += 1
+                        alerta = 'Se ha detectado la flag '+str(val[0])+' en el estado del kernel, la cual se considera de peligrosidad media'
+                        resultados["alertas"].append(str(alerta))
+                        if verbose:
+                            print("     [!] "+str(alerta))
+                    
+                    elif val in black_list:
+                        alerta = 'Se ha detectado la flag '+str(val[0])+' en el estado del kernel, la cual se considera un fallo crítico'
+                        resultados["alertas"].append(str(alerta))
+                        problemas_tai += 1
+                        if verbose:
+                            print("     [X] "+str(alerta))
+                    
+                    else:
+                        # Es o "P" o "O", es decir white_list
+                        detalle = 'Se ha detectado la flag '+str(val[0])+' en el estado del kernel, la cual se considera segura'
+                        resultados["detalles"].append(str(detalle))
+                        if verbose:
+                            print("     [V] "+str(detalle))
+        
+    # La consulta no de puede realizar
+    else:
+        alerta = 'No se ha logrado obtener el valor "tainted" del kernel, por lo que no se sabe si el kernel ha sido alterado'
+        resultados["alertas"].append(alerta)
+        problemas_tai += 1
+        if verbose:
+            print("     [ERROR] "+str(alerta))
+        
+    # Evaluamos el estado del kernel
+    if problemas_tai == 0:
+        resultados["kernel_seguro"] = True
+        if warning_tai == 0:
+            detalle = 'Todas las flags del kernel se consideran seguras'
+            resultados["detalles"].append(detalle)
+            if verbose:
+                print("     [V] "+str(detalle))
+        else:
+            alerta = 'Se han detectado '+str(warning_tai)+' flags de peligrosidad media, revise los módulos cargados'
+            resultados["alertas"].append(alerta)
+            if verbose:
+                print("     [!] "+str(alerta))
+
+    else:
+        alerta = 'Se han detectado '+str(problemas_tai)+' flags consideradas como fallos críticos'
+        resultados["alertas"].append(alerta)
+        if verbose:
+            print("     [X] "+str(alerta))
+    return resultados
 
 
 
@@ -98,7 +185,7 @@ def auditar_parametros_kernel(verbose):
                 
     except Exception as e:
         print("     [ERROR] Fallo al leer '/etc/default/grub': "+str(e))
-        resultados["alertas"] = "No se ha logrado leer el archivo /etc/default/grub"
+        resultados["alertas"].append("No se ha logrado leer el archivo /etc/default/grub")
         return resultados
     
     ########### Comprobamos si los parametros de la white_list (que consideramos obligatorios) están en grub y grub_default ###########################################
@@ -189,7 +276,7 @@ def auditar_parametros_kernel(verbose):
                 
     ####### Calificamos resultados ################################################################################################
     
-    if len(resultados["fallos"]) > 0 or len(resultados["prohibidos"]) > 0:
+    if len(resultados["fallos"]) > 0 or len(resultados["prohibido"]) > 0:
         resultados["estado"] = "PELIGROSO"
         if verbose:
             print(" [X] Los parametros del kernel son peligrosos y suponen un fallo crítico de seguridad")
@@ -329,41 +416,17 @@ def auditar_seguridad_grub(verbose, datos_grub):
 
 ###########################################################################################################################
 
-def auditar_rendimiento_arranque(verbose, max_time):
-    print("[+] Analizando anomalías temporales en la secuencia de encendido")
-    reporte_tiempo = {
-        "tiempo_total_s": 0.0,
-        "excede_limite": False,
-        "culpable_principal": None,
-        "detalles": []
-    }
-    
-    # 1. Lanzaremos 'systemd-analyze time' para ver cuánto tardó en arrancar el PC.
-    # 2. Parsearemos la salida (que a veces viene en minutos y segundos) a segundos totales.
-    # 3. Si el tiempo supera 'max_time', lanzaremos 'systemd-analyze blame' para cazar 
-    #    al proceso que está ralentizando/secuestrando el arranque.
-    
-    return reporte_tiempo
-
-
-
-
-###########################################################################################################################
-
-def ESCANER_booting(verbose):
+def ESCANER_booting(verbose, datos_grub):
     resultados = {
         "integridad": {},
         "parametros": {},
         "grub": {},
-        "rendimiento": {}
     }
     
     print("\n--- [ FASE 5: AUDITORÍA DE ARRANQUE E INTEGRIDAD (BOOTING) ] ---")
     print("[+] Iniciando módulo de escaneo de arranque...")
     resultados["integridad"] = auditar_integridad_firmware(verbose)
     resultados["parametros"] = auditar_parametros_kernel(verbose)
-    resultados["grub"] = auditar_seguridad_grub(verbose)
-    resultados["rendimiento"] = auditar_rendimiento_arranque(verbose)
-    
+    resultados["grub"] = auditar_seguridad_grub(verbose,  datos_grub)    
     print("[-] Finalizando módulo de escaneo de arranque")
     return resultados

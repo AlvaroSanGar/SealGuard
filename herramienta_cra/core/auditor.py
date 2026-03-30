@@ -4,7 +4,7 @@ from modules.vulns import ESCANER_vulnerabilidades
 from modules.integrity import ESCANEO_integridad, generar_baseline
 from modules.users import ESCANER_usuarios
 from modules.hardening import ESCANER_hardening
-from modules.booting import ESCANER_booting, auditar_parametros_kernel, auditar_seguridad_grub
+from modules.booting import ESCANER_booting
 
 def escaneo_baseline():
     generar_baseline()
@@ -20,7 +20,8 @@ def escaneo_normal(verbose):
         "usuarios": [],
         "2FA": [],
         "integridad": [],
-        "hardening": {}
+        "hardening": {},
+        "boot": {}
     }
     '''
     datos_reporte["sistema"] = ESCANEO_info_Simple(verbose)
@@ -45,9 +46,7 @@ def escaneo_normal(verbose):
         if archivos["archivo"] == '/etc/default/grub':
             datos_grub = archivos
     
-    
-    #datos = auditar_parametros_kernel(verbose)
-    datos = auditar_seguridad_grub(verbose, datos_grub)
+    datos_reporte["boot"] = ESCANER_booting(verbose, datos_grub)
     '''
     print("\n\nRESULTADOS SISTEMA\n", datos_reporte["sistema"])
     print("\n\nRESULTADOS DE NETWORKING\n", datos_reporte["puertos"])
