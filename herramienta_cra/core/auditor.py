@@ -23,7 +23,7 @@ def escaneo_normal(verbose):
         "hardening": {},
         "boot": {}
     }
-    '''
+    
     datos_reporte["sistema"] = ESCANEO_info_Simple(verbose)
     datos_reporte["puertos"] = ESCANEO_Networking(verbose)
     
@@ -37,7 +37,6 @@ def escaneo_normal(verbose):
     datos_reporte["politicas_contra"] = usu.get("politicas")
     datos_reporte["usuarios"] = usu.get("usuarios")
     datos_reporte["2FA"] = usu.get("2FA")
-   '''
     datos_reporte["hardening"] = ESCANER_hardening(verbose)
     
     # Obtenemos el resultado de los permisos y dueño de /etc/default/grub

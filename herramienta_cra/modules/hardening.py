@@ -78,7 +78,7 @@ def auditar_archivos_criticos(verbose):
     if "/etc/default/grub" not in rutas_existentes:
         archivos_yaml.append({
             "path": "/etc/default/grub",
-            "max_permissions": "600",
+            "max_permissions": "644",
             "owner": "root"
         })
     

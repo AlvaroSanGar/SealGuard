@@ -32,7 +32,7 @@ def auditar_integridad_firmware(verbose):
     respuesta = ejecutar_consulta(query)
     # En caso de que la tabla contenga algún registro
     if len(respuesta) > 0:
-        resul_SB = respuesta.get('secure_boot')
+        resul_SB = respuesta[0].get('secure_boot')
         if resul_SB == 1:
             resultados["secure_boot"] = True
             detalle = 'El sistema tiene activado Secure Boot con el modo Full-Security'
@@ -47,7 +47,7 @@ def auditar_integridad_firmware(verbose):
                 print("     [X] "+str(alerta))
         
         else:
-            alerta = 'El sistema no tiene activado Secure Boot con el modo Medium-Security'
+            alerta = 'El sistema no tiene activado Secure Boot'
             resultados["alertas"].append(alerta)
             if verbose:
                 print("     [X] "+str(alerta))
@@ -279,17 +279,17 @@ def auditar_parametros_kernel(verbose):
     if len(resultados["fallos"]) > 0 or len(resultados["prohibido"]) > 0:
         resultados["estado"] = "PELIGROSO"
         if verbose:
-            print(" [X] Los parametros del kernel son peligrosos y suponen un fallo crítico de seguridad")
+            print("     [X] Los parametros del kernel son peligrosos y suponen un fallo crítico de seguridad")
     
     elif len(resultados["alertas"]) > 0:
         resultados["estado"] = "ADVERTENCIA"
         if verbose:
-            print(" [!] Los parametros del kernel no lo protegen en caso de arranque de rescate")
+            print("     [!] Los parametros del kernel no lo protegen en caso de arranque de rescate")
         
     else:
         resultados["estado"] = "SEGURO"
         if verbose:
-            print(" [V] Los parametros del kernel se consideran seguros")
+            print("     [V] Los parametros del kernel se consideran seguros")
             
     return resultados
 
@@ -307,7 +307,7 @@ def auditar_parametros_kernel(verbose):
 ###########################################################################################################################
 
 def auditar_seguridad_grub(verbose, datos_grub):
-    print("[+] Comprobando blindaje del gestor de arranque (GRUB)")
+    print("[+] Comprobando la seguridad del gestor de arranque")
     resultados = {
         "estado": "PELIGROSO",
         "protegido": False,
@@ -423,7 +423,7 @@ def ESCANER_booting(verbose, datos_grub):
         "grub": {},
     }
     
-    print("\n--- [ FASE 5: AUDITORÍA DE ARRANQUE E INTEGRIDAD (BOOTING) ] ---")
+    print("\n--- [ FASE 6: AUDITORÍA DE ARRANQUE ] ---")
     print("[+] Iniciando módulo de escaneo de arranque...")
     resultados["integridad"] = auditar_integridad_firmware(verbose)
     resultados["parametros"] = auditar_parametros_kernel(verbose)

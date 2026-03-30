@@ -79,9 +79,7 @@ hardening:
     - path: "/etc/sudoers" 
       max_permissions: "440"
       owner: "root"
-    - path: "/etc/default/grub"
-      max_permissions: "600"
-      owner: "root"
+
   
   suid_sgid:
     critical_directories: ["/tmp/", "/home/", "/dev/shm/"]
