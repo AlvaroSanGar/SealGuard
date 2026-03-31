@@ -3,12 +3,16 @@ import json
 import os
 from config.settings import config
 
-def calcular_hash(ruta):
+def calcular_integridad(ruta):
     # Comprobamos si existe
+    
     if not os.path.exists(ruta):
         return None
     
     try:
+        mtime = os.stat(ruta).st_mtime
+        ctime = os.stat(ruta).st_ctime
+        
         h = hashlib.new("SHA256")
         with open(ruta, "rb") as f: # Abrimos el archivo (se cierra al terminar incluso en fallo) y leemos el binario
             
@@ -17,7 +21,11 @@ def calcular_hash(ruta):
             # vacios (esto lo hacemos con b"")
             for bloque in iter(lambda: f.read(4096), b""):
                 h.update(bloque)
-        return h.hexdigest()
+        return {
+            "hash": h.hexdigest(),
+            "mtime": mtime,
+            "ctime": ctime
+        }
     
     except PermissionError:
         return "FALTAN PERMISOS"
@@ -31,7 +39,7 @@ def calcular_hash(ruta):
 def generar_baseline():
     print("[+] Iniciando recopilación de hashes críticos")
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['system']['critical_files']]
+    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
     binarios = config['integrity']['monitored_binaries']
     configs_int = config['integrity']['monitored_configs']
     todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))
@@ -40,12 +48,13 @@ def generar_baseline():
     
     # Para cada archivo nos guardamos el hash asociado y lo metemos en un diccionario
     for ruta in todas_las_rutas:
-        hash_val = calcular_hash(ruta)
+        hash_val = calcular_integridad(ruta)
         # Comprobamos que nos devuelve la función, solo lo guardamos si obtenemos exitosamente el hash
         if hash_val == None:
             print("     [!] El archivo '"+ruta+"' no existe")
-            
-        elif hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:"):
+        
+        # Comprobamos si el contenido de hash_val es un string, si es así entonces de trata de un error (por si acaso lo comprobamos también)    
+        elif isinstance(hash_val, str) and (hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:")):
             print("     [!] No se ha logrado obtener el archivo de '"+ruta+"' -> "+str(hash_val))
             
         else:
@@ -74,7 +83,7 @@ def verificar_integridad(verbose):
     print("[+] Iniciando módulo de integridad")
     
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['system']['critical_files']]
+    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
     binarios = config['integrity']['monitored_binaries']
     configs_int = config['integrity']['monitored_configs']
     todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))
@@ -93,13 +102,14 @@ def verificar_integridad(verbose):
     
     # Obtenemos los hashes igual que en baseline
     for ruta in todas_las_rutas:
-        hash_val = calcular_hash(ruta)
+        hash_val = calcular_integridad(ruta)
         
         # Comprobamos que nos devuelve la función, solo lo guardamos si obtenemos exitosamente el hash
         if hash_val == None:
             print("     [!] El archivo '"+ruta+"' no existe")
             
-        elif hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:"):
+        # Igual que en baseline    
+        elif isinstance(hash_val, str) and (hash_val == "FALTAN PERMISOS" or hash_val.startswith("ERROR:")):
             print("     [!] No se ha logrado obtener el archivo de '"+ruta+"' -> "+str(hash_val))
             
         else:

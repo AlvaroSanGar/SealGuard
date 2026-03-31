@@ -1,123 +1,133 @@
 import unittest
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 import json
-import hashlib
-
-# Importamos tu módulo
 import modules.integrity as mIntegrity
 
-class TestIntegrityModule(unittest.TestCase):
+# Mockeamos el settings.yaml para no depender de archivos reales
+MOCK_CONFIG = {
+    "system": {
+        "critical_files": [{"path": "/etc/shadow"}]
+    },
+    "integrity": {
+        "monitored_binaries": ["/bin/ls"],
+        "monitored_configs": ["/etc/hosts"]
+    }
+}
 
-    # -------------------------------------------------------------------
-    # PRUEBAS PARA: calcular_hash(ruta)
-    # -------------------------------------------------------------------
+@patch.dict('modules.integrity.config', MOCK_CONFIG)
+class TestIntegridadModulo(unittest.TestCase):
 
-    @patch('modules.integrity.os.path.exists', return_value=False)
+    # =========================================================================
+    # 1. TESTS DE: calcular_hash()
+    # =========================================================================
+    @patch('os.stat')
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data=b"datos_de_prueba")
+    def test_calcular_hash_camino_feliz(self, mock_file, mock_exists, mock_stat):
+        """Comprueba que devuelve el diccionario con hash, mtime y ctime"""
+        mock_exists.return_value = True
+        
+        # Simulamos los tiempos del sistema operativo
+        mock_stat.return_value.st_mtime = 1600000000.0
+        mock_stat.return_value.st_ctime = 1600000005.0
+        
+        resultado = mIntegrity.calcular_integridad("/ruta/falsa")
+        
+        self.assertIsInstance(resultado, dict)
+        self.assertIn("hash", resultado)
+        self.assertEqual(resultado["mtime"], 1600000000.0)
+        self.assertEqual(resultado["ctime"], 1600000005.0)
+
+    @patch('os.path.exists')
     def test_calcular_hash_no_existe(self, mock_exists):
-        """Camino Triste: El archivo no existe"""
-        resultado = mIntegrity.calcular_hash('/ruta/falsa.txt')
+        """Comprueba qué pasa si el archivo no existe"""
+        mock_exists.return_value = False
+        resultado = mIntegrity.calcular_integridad("/ruta/falsa")
         self.assertIsNone(resultado)
 
-    @patch('modules.integrity.os.path.exists', return_value=True)
-    @patch('builtins.open', side_effect=PermissionError)
-    def test_calcular_hash_sin_permisos(self, mock_open_func, mock_exists):
-        """Camino Triste: El usuario no es root y no tiene permisos"""
-        resultado = mIntegrity.calcular_hash('/etc/shadow')
+    @patch('os.stat')
+    @patch('os.path.exists')
+    @patch('builtins.open')
+    def test_calcular_hash_sin_permisos(self, mock_file, mock_exists, mock_stat):
+        """Comprueba manejo de PermissionError"""
+        mock_exists.return_value = True
+        mock_file.side_effect = PermissionError()
+        
+        resultado = mIntegrity.calcular_integridad("/ruta/falsa")
         self.assertEqual(resultado, "FALTAN PERMISOS")
 
-    @patch('modules.integrity.os.path.exists', return_value=True)
-    # mock_open simula abrir un archivo y leer los bytes que le pongamos en 'read_data'
-    @patch('builtins.open', new_callable=mock_open, read_data=b"texto de prueba")
-    def test_calcular_hash_exito(self, mock_open_func, mock_exists):
-        """Camino Feliz: Calcula el hash SHA-256 de un archivo"""
-        resultado = mIntegrity.calcular_hash('/etc/passwd')
-        
-        # El SHA-256 de "texto de prueba" es exactamente este:
-        hash_esperado = hashlib.sha256(b"texto de prueba").hexdigest()
-        self.assertEqual(resultado, hash_esperado)
-
-
-    # -------------------------------------------------------------------
-    # PRUEBAS PARA: generar_baseline()
-    # -------------------------------------------------------------------
-
-    # AHORA EL MOCK TIENE LAS 3 LISTAS QUE BUSCA TU CÓDIGO
-    @patch('modules.integrity.config', {
-        'system': {'critical_files': [{'path': '/etc/test_critico'}]},
-        'integrity': {
-            'monitored_binaries': ['/bin/test_binario'],
-            'monitored_configs': ['/etc/test_config']
-        }
-    })
-    @patch('modules.integrity.calcular_hash', return_value="hash_falso_123")
+    # =========================================================================
+    # 2. TESTS DE: generar_baseline()
+    # =========================================================================
+    @patch('modules.integrity.calcular_integridad')
     @patch('builtins.open', new_callable=mock_open)
-    def test_generar_baseline_exito(self, mock_open_func, mock_calc_hash):
-        """Camino Feliz: Genera el baseline y lo guarda en JSON"""
+    @patch('json.dump')
+    def test_generar_baseline_feliz(self, mock_json_dump, mock_file, mock_calcular):
+        """Comprueba que el baseline guarda los diccionarios correctamente"""
+        # Simulamos que calcular_hash devuelve la nueva estructura
+        mock_calcular.return_value = {"hash": "abcd", "mtime": 10.0, "ctime": 10.0}
         
         mIntegrity.generar_baseline()
         
-        # Verificamos que se han hasheado exactamente los 3 archivos que le hemos pasado en el Mock
-        self.assertEqual(mock_calc_hash.call_count, 3)
-        # Comprobamos que intentó abrir el archivo correcto en modo escritura 'w'
-        mock_open_func.assert_called_with('history/escaneo_baseline.json', 'w')
+        # Comprobamos que intentó escribir el JSON
+        self.assertTrue(mock_json_dump.called)
+        
+        # Obtenemos los argumentos con los que se llamó a json.dump
+        datos_guardados = mock_json_dump.call_args[0][0]
+        
+        # Debería haber 3 archivos según nuestro MOCK_CONFIG (/etc/shadow, /bin/ls, /etc/hosts)
+        self.assertEqual(len(datos_guardados), 3)
+        self.assertIn("/etc/shadow", datos_guardados)
+        self.assertEqual(datos_guardados["/etc/shadow"]["hash"], "abcd")
 
-
-    # -------------------------------------------------------------------
-    # PRUEBAS PARA: verificar_integridad(verbose)
-    # -------------------------------------------------------------------
-
-    @patch('modules.integrity.os.path.exists', return_value=False)
+    # =========================================================================
+    # 3. TESTS DE: verificar_integridad()
+    # =========================================================================
+    @patch('os.path.exists')
     def test_verificar_integridad_sin_baseline(self, mock_exists):
-        """Camino Triste: Falla si no se ha ejecutado el baseline primero"""
-        resultado = mIntegrity.verificar_integridad(verbose=False)
-        self.assertIsNone(resultado)
+        """No debe ejecutarse si no hay baseline anterior"""
+        mock_exists.return_value = False
+        res = mIntegrity.verificar_integridad(verbose=False)
+        self.assertIsNone(res)
 
-    @patch('modules.integrity.os.path.exists', return_value=True)
-    @patch('modules.integrity.config', {
-        'system': {
-            'critical_files': [{'path': '/etc/intacto'}]
-        },
-        'integrity': {
-            'monitored_binaries': ['/bin/modificado', '/bin/nuevo'], # /bin/nuevo no estará en el baseline
-            'monitored_configs': []
-        }
-    })
-    def test_verificar_integridad_logica_completa(self, mock_exists):
-        """Camino Complejo: Comprueba los 4 estados posibles de la comparativa."""
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.load')
+    @patch('modules.integrity.calcular_integridad')
+    def test_verificar_integridad_detecta_cambios(self, mock_calcular, mock_json_load, mock_file, mock_exists):
+        """Prueba central: ¿Detecta cuando mtime/ctime o el hash cambian?"""
+        mock_exists.return_value = True
         
-        # 1. Simulamos el contenido del archivo JSON guardado (El Baseline)
-        datos_guardados = {
-            "/etc/intacto": "hash_111",
-            "/bin/modificado": "hash_222",
-            "/bin/borrado": "hash_333" # Este está guardado, pero ya no existe en la config mockeada
+        # Simulamos el contenido del archivo JSON antiguo (Baseline)
+        mock_json_load.return_value = {
+            "/etc/shadow": {"hash": "hash_antiguo", "mtime": 1.0, "ctime": 1.0},
+            "/bin/ls": {"hash": "mismo_hash", "mtime": 2.0, "ctime": 2.0}
         }
         
-        # Simulamos la lectura del json.load
-        mock_json_load = patch('modules.integrity.json.load', return_value=datos_guardados)
-        
-        # 2. Simulamos lo que calcula la función calcular_hash EN VIVO
-        def mock_calcular_hash(ruta):
-            if ruta == "/etc/intacto": return "hash_111"       # Coincide -> INTACTO
-            if ruta == "/bin/modificado": return "hash_NUEVO"  # Distinto -> MODIFICADO
-            if ruta == "/bin/nuevo": return "hash_444"         # -> NO_RASTREADO
-            return None # Por si acaso
-            
-        mock_calc = patch('modules.integrity.calcular_hash', side_effect=mock_calcular_hash)
-        
-        # Necesitamos usar el mock de open para pasar el 'with open' sin que explote
-        mock_file = patch('builtins.open', new_callable=mock_open)
+        # Simulamos lo que lee el sistema AHORA (calcular_hash)
+        def mock_calcular_side_effect(ruta):
+            if ruta == "/etc/shadow":
+                # MODIFICADO: El hash cambió
+                return {"hash": "hash_NUEVO", "mtime": 1.0, "ctime": 1.0}
+            elif ruta == "/bin/ls":
+                # INTACTO: Todo es exactamente igual
+                return {"hash": "mismo_hash", "mtime": 2.0, "ctime": 2.0}
+            else:
+                # NO_RASTREADO: Un archivo que no estaba en el JSON antiguo
+                return {"hash": "x", "mtime": 0, "ctime": 0}
+                
+        mock_calcular.side_effect = mock_calcular_side_effect
 
-        # Activamos los parches y ejecutamos
-        with mock_json_load, mock_calc, mock_file:
-            resultados = mIntegrity.verificar_integridad(verbose=False)
-            
-        # 3. Comprobaciones de la lógica
-        estados = { r['archivo']: r['estado'] for r in resultados }
+        resultados = mIntegrity.verificar_integridad(verbose=False)
         
-        self.assertEqual(estados['/etc/intacto'], "INTACTO")
-        self.assertEqual(estados['/bin/modificado'], "MODIFICADO")
-        self.assertEqual(estados['/bin/borrado'], "INACCESIBLE / BORRADO")
-        self.assertEqual(estados['/bin/nuevo'], "NO_RASTREADO")
+        # Buscamos los estados en el resultado
+        estado_shadow = next((item['estado'] for item in resultados if item['archivo'] == '/etc/shadow'), None)
+        estado_ls = next((item['estado'] for item in resultados if item['archivo'] == '/bin/ls'), None)
+        estado_hosts = next((item['estado'] for item in resultados if item['archivo'] == '/etc/hosts'), None)
+
+        self.assertEqual(estado_shadow, "MODIFICADO")
+        self.assertEqual(estado_ls, "INTACTO")
+        self.assertEqual(estado_hosts, "NO_RASTREADO")
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)

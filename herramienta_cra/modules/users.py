@@ -3,7 +3,7 @@ import modules.system as mSystem
 from config.settings import config
 
 def info_usuarios_base(verbose, uid_min):
-    print("[+] Recopilando información base de usuarios...")
+    print("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
     critical_groups = config["users"]["critical_groups"]
@@ -57,7 +57,7 @@ def info_usuarios_base(verbose, uid_min):
     datos_shadow = mSystem.ejecutar_consulta(query)
     
     if verbose:
-        print("\n     [i] Metadatos de contraseñas extraídos de la tabla shadow (Filtrado).")
+        print("\n     [i] Políticas de contraseñas extraídos del archivo shadow.")
 
     #################### Unificamos datos ##############################################################
     resultado = juntar_datos(usuarios, usu_grupos_criticos, datos_shadow)
@@ -122,7 +122,7 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 ##################################################################################################################################
 
 def politicas_passwords(verbose):
-    print("[+] Auditando políticas de contraseñas generales...")
+    print("[+] Auditando políticas de contraseñas generales")
     politicas = config["users"]["politics"]
     politica_general = {}
     try:
@@ -165,7 +165,7 @@ def politicas_passwords(verbose):
 
 
 def comp_2FA(verbose, usuarios):
-    print("[+] Buscando métodos de doble factor (2FA)...")
+    print("[+] Buscando métodos de doble factor de autentificación")
     modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
     servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']

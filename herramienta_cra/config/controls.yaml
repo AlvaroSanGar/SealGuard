@@ -39,27 +39,7 @@ vulnerabilities:
 
 #(Anexo I.1.2 - Gestión de identidades)
 system: 
-  critical_files:
-    - path: "/etc/shadow"
-      max_permissions: "640" # rw-r-----
-      owner: "root"
-
-    - path: "/etc/passwd"
-      max_permissions: "644" # rw-r--r--
-      owner: "root"
-
-    - path: "/etc/ssh/sshd_config"
-      max_permissions: "600" # rw-------
-      owner: "root"
-
-    - path: "/etc/crontab"
-      max_permissions: "644"
-      owner: "root"
-
-    - path: "/etc/sudoers" 
-      max_permissions: "440"
-      owner: "root"
-
+  
   updates:
     check_unattended_upgrades: true 
     check_days_since_last_update: 7
@@ -81,22 +61,65 @@ integrity:
     - "/etc/fstab"
 
 
-# (Anexo I.1.4 - Confidencialidad)
+
 hardening: 
+  critical_files:
+    - path: "/etc/shadow"
+      max_permissions: "640" 
+      owner: "root"
+    - path: "/etc/passwd"
+      max_permissions: "644" 
+      owner: "root"
+    - path: "/etc/ssh/sshd_config"
+      max_permissions: "600" 
+      owner: "root"
+    - path: "/etc/crontab"
+      max_permissions: "644"
+      owner: "root"
+    - path: "/etc/sudoers" 
+      max_permissions: "440"
+      owner: "root"
+
+  
+  suid_sgid:
+    critical_directories: ["/tmp/", "/home/", "/dev/shm/"]
+    forviden_permissions: ["2", "3", "6", "7"] # w, wx, rw, rwx
+
   ssh:
-    permit_root_login: ["no", "prohibit-password"]
-    password_authentication: "no"
-    protocol: "2"
-  firewall:
-    check_active: true
-    allowed_tools: ["ufw", "iptables"]
+    secure_params:
+      PermitRootLogin: "no"
+      PermitEmptyPasswords: "no"
+      PasswordAuthentication: "no"  # Obligamos a usar claves 
+      MaxAuthTries: "4"             # Corta la conexión rápido si fallan
+      MaxSessions: "2"
 
+    allowed_users:
+      - "usu_prueba@10.0.2.8"
 
-# (Anexo I.1.4 - Confidencialidad)
-encryption: 
-  algoritmo: "sha256"
-  comp_luks: true
-  critical_mounts: ["/", "/home", "/var"]
+  firewall_services:
+    - "ufw.service"
+    - "firewalld.service"
+    - "iptables.service"
+    - "nftables.service"
+
+  system_checks:
+    check_suid_sgid: true
+    check_aslr: true
+    check_mac: true # AppArmor / SELinux
+
+  certificados:
+    dias_aviso_caducidad: 30
+    min_rsa_key_size: 2048
+    algoritmos_permitidos: 
+      - "sha256WithRSAEncryption"
+      - "sha384WithRSAEncryption"
+      - "sha512WithRSAEncryption"
+      - "ecdsa-with-SHA256"
+      - "ecdsa-with-SHA384"
+
+  encryption: 
+    algoritmo: "sha256"
+    critical_mounts: ["/", "/home", "/var"]
 
 
 # (Anexo I.1.5 - Resiliencia)
@@ -108,23 +131,48 @@ backups:
 
 
 users:
-    check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
-    disallow_empty_passwords: true
-    max_password_days: 90
-    critical_groups: ["root", "sudo", "adm"]
-    politics: ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
-    mfa:
-      modulos_pam_2fa: 
-        - "pam_google_authenticator.so"
-        - "pam_duo.so"
-        - "pam_yubico.so"
-        - "pam_u2f.so"
+  check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
+  disallow_empty_passwords: true
+  max_password_days: 90
+  critical_groups: ["root", "sudo", "adm"]
+  politics: ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
+  mfa:
+    modulos_pam_2fa: 
+      - "pam_google_authenticator.so"
+      - "pam_duo.so"
+      - "pam_yubico.so"
+      - "pam_u2f.so"
 
-      servicios_pam_a_revisar:
-        - "sshd"
-        - "sudo"
-        - "login"
+    servicios_pam_a_revisar:
+      - "sshd"
+      - "sudo"
+      - "login"
 
-      tokens_requeridos:
-        ".google_authenticator": "pam_google_authenticator.so"
-        ".yubico": "pam_yubico.so"
+    tokens_requeridos:
+      ".google_authenticator": "pam_google_authenticator.so"
+      ".yubico": "pam_yubico.so"
+
+boot:
+  param_kernel:
+    white_list:
+      - ["apparmor=1", "selinux=1", "enforcing=1"]  # Fuerza control de acceso obligatorio
+      - "audit=1"
+      - "slab_nomerage=1"
+      - "page_poison=1"
+    
+    black_list:
+      - ["init=/bin/bash", "init=single", "single"]
+      - "nokaslr"
+      - ["mitigations=off", "nopti"]
+
+  contra_fisica: false
+
+  integridad_kernel:
+    white_list: [["P", 0], ["O", 4096]]
+
+    warning_list: [["W", 512], ["C", 1024], ["K", 32768]]
+
+    black_list: [["F", 2], ["R", 8], ["D", 128], ["A", 256], ["E", 8192]]
+    
+
+

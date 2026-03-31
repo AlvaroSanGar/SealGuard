@@ -1,9 +1,59 @@
 import requests
 import modules.system as mSystem
 import json
+import time
+from config.settings import config
+
+# Diccionario caché para no consultar el NIST dos veces por el mismo CVE 
+cache_cvss = {}
+
+def obtener_score_cvss(cve_id):
+    if cve_id in cache_cvss:
+        return cache_cvss[cve_id]
+        
+    # El NIST solo entiende IDs que empiecen por CVE. Si OSV devuelve un GHSA, le ponemos 0.0
+    if not cve_id.startswith("CVE-"):
+        cache_cvss[cve_id] = 0.0
+        return 0.0
+        
+    url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
+    try:
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200: # Obtenemos los datos de la respuesta de la API y cargamos las vulns
+            datos = response.json()
+            vulnerabilidades = datos.get("vulnerabilities", [])
+            
+            if vulnerabilidades:
+                metricas = vulnerabilidades[0].get("cve", {}).get("metrics", {})
+                score = 0.0
+                if "cvssMetricV31" in metricas:
+                    score = metricas["cvssMetricV31"][0]["cvssData"]["baseScore"]
+                elif "cvssMetricV3" in metricas:
+                    score = metricas["cvssMetricV3"][0]["cvssData"]["baseScore"]
+                elif "cvssMetricV2" in metricas:
+                    score = metricas["cvssMetricV2"][0]["cvssData"]["baseScore"]
+                    
+                cache_cvss[cve_id] = score
+                time.sleep(0.5) # Pausa para no saturar la API 
+                return score
+    except Exception:
+        pass # Si falla la conexión o hay timeout, evitamos que pete
+        
+    cache_cvss[cve_id] = 0.0
+    return 0.0
+
+
+
+
+
+################################################################################################################
 
 def escanear_vulnerabilidades(paquetes):
     print("     [i] Consultando base de datos OSV.dev para " + str(len(paquetes)) + " paquetes...")
+    
+    # Obtenemos el peligro mínimo del yaml
+    min_cvss = float(config["vulnerabilities"].get("min_cvss_score", 0.0))
     
     url = "https://api.osv.dev/v1/querybatch"
     consultas = []
@@ -33,22 +83,29 @@ def escanear_vulnerabilidades(paquetes):
                         # Recuperamos el paquete original para tener sus datos
                         pkg_orig = paquetes[i + index]
                         
-                        # Extraemos los IDs de los CVEs
+                        # Extraemos los IDs de los CVEs y calculamos su CVSS
                         cves = []
                         for v in res['vulns']:
-                            cves.append(v['id'])
+                            vuln_id = v['id']
+                            score = obtener_score_cvss(vuln_id)
+                            
+                            # Solo guardamos si el score es mayor o igual al yaml
+                            if score >= min_cvss:
+                                cves.append({"id": vuln_id, "score": score})
                         
-                        detalle_url = "https://osv.dev/list?q=" + pkg_orig['name']
-                        
-                        hallazgo = {
-                            "paquete": pkg_orig['name'],
-                            "version": pkg_orig['version'],
-                            "tipo": pkg_orig.get('type', 'Unknown'),
-                            "cves": cves,
-                            "cantidad": len(cves),
-                            "detalle_url": detalle_url
-                        }
-                        hallazgos.append(hallazgo)
+                        # Solo creamos el hallazgo si al menos 1 CVE superó el filtro CVSS
+                        if len(cves) > 0:
+                            detalle_url = "https://osv.dev/list?q=" + pkg_orig['name']
+                            
+                            hallazgo = {
+                                "paquete": pkg_orig['name'],
+                                "version": pkg_orig['version'],
+                                "tipo": pkg_orig.get('type', 'Unknown'),
+                                "cves": cves,
+                                "cantidad": len(cves),
+                                "detalle_url": detalle_url
+                            }
+                            hallazgos.append(hallazgo)
             else:
                 print("    [!] Error en lote " + str(i) + ": Status " + str(response.status_code))
                 
@@ -117,8 +174,9 @@ def ESCANER_vulnerabilidades(verbose):
             vulns.sort(key=lambda x: x['cantidad'], reverse=True)
             
             for v in vulns[:5]:
-                primer_cve = v['cves'][0]
-                print("     [!] [" + v['tipo'] + "] " + v['paquete'] + " v" + v['version'] + " -> " + str(v['cantidad']) + " Vulns (" + primer_cve + "...)")
+                primer_cve = v['cves'][0]['id']
+                primer_score = v['cves'][0]['score']
+                print("     [!] [" + v['tipo'] + "] " + v['paquete'] + " v" + v['version'] + " -> " + str(v['cantidad']) + " Vulns (" + primer_cve + " [CVSS: " + str(primer_score) + "]...)")
     else:
         print("[!] No hay paquetes para analizar (Fase 2 vacía).")
     print("[-] Finalizando módulo de detección de vulnerabilidades")
