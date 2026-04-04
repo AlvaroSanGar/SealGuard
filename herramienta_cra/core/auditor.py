@@ -5,6 +5,7 @@ from modules.integrity import ESCANEO_integridad, generar_baseline
 from modules.users import ESCANER_usuarios
 from modules.hardening import ESCANER_hardening
 from modules.booting import ESCANER_booting
+from modules.availability import ESCANER_disponibilidad
 
 def escaneo_baseline():
     generar_baseline()
@@ -21,7 +22,8 @@ def escaneo_normal(verbose):
         "2FA": [],
         "integridad": [],
         "hardening": {},
-        "boot": {}
+        "boot": {},
+        "disponibilidad": {}
     }
     
     datos_reporte["sistema"] = ESCANEO_info_Simple(verbose)
@@ -46,6 +48,8 @@ def escaneo_normal(verbose):
             datos_grub = archivos
     
     datos_reporte["boot"] = ESCANER_booting(verbose, datos_grub)
+    datos_reporte["disponibilidad"] = ESCANER_disponibilidad(verbose)
+    
     '''
     print("\n\nRESULTADOS SISTEMA\n", datos_reporte["sistema"])
     print("\n\nRESULTADOS DE NETWORKING\n", datos_reporte["puertos"])

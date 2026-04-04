@@ -15,7 +15,7 @@ class TestNetworkModule(unittest.TestCase):
         }
     })
     @patch('modules.network.nmap.PortScanner')
-    def test_scaneoPuertos_exito_y_clasificacion(self, mock_port_scanner):        
+    def test_escaneo_puertos_exito_y_clasificacion(self, mock_port_scanner):        
         mock_nm = MagicMock()
         mock_port_scanner.return_value = mock_nm
         
@@ -41,7 +41,7 @@ class TestNetworkModule(unittest.TestCase):
         mock_nm.__getitem__.side_effect = lambda ip: mock_host
 
         # Ejecutamos tu función
-        resultado = mNetwork.scaneoPuertos(['1.1.1.1'], verbose=False)
+        resultado = mNetwork.escaneo_puertos(['1.1.1.1'], verbose=False)
 
         # Comprobamos que ha procesado los 3 puertos
         self.assertEqual(len(resultado), 3)
@@ -62,7 +62,7 @@ class TestNetworkModule(unittest.TestCase):
 
     @patch('modules.network.config', {'network': {'white_list': [], 'black_list': []}})
     @patch('modules.network.nmap.PortScanner')
-    def test_scaneoPuertos_nmap_no_instalado(self, mock_port_scanner):
+    def test_escaneo_puertos_nmap_no_instalado(self, mock_port_scanner):
         
         mock_nm = MagicMock()
         mock_port_scanner.return_value = mock_nm
@@ -70,7 +70,7 @@ class TestNetworkModule(unittest.TestCase):
         # Forzamos que el método scan salte con el error específico de la librería nmap
         mock_nm.scan.side_effect = nmap.PortScannerError("Nmap not found")
         
-        resultado = mNetwork.scaneoPuertos(['1.1.1.1'], verbose=False)
+        resultado = mNetwork.escaneo_puertos(['1.1.1.1'], verbose=False)
         
         # Tu bloque 'except nmap.PortScannerError:' debe devolver una lista vacía
         self.assertEqual(resultado, [])
@@ -78,7 +78,7 @@ class TestNetworkModule(unittest.TestCase):
 
     @patch('modules.network.config', {'network': {'white_list': [], 'black_list': []}})
     @patch('modules.network.nmap.PortScanner')
-    def test_scaneoPuertos_error_generico(self, mock_port_scanner):
+    def test_escaneo_puertos_error_generico(self, mock_port_scanner):
         
         mock_nm = MagicMock()
         mock_port_scanner.return_value = mock_nm
@@ -86,7 +86,7 @@ class TestNetworkModule(unittest.TestCase):
         # Forzamos una excepción genérica
         mock_nm.scan.side_effect = Exception("Fallo de red o timeout")
         
-        resultado = mNetwork.scaneoPuertos(['1.1.1.1'], verbose=False)
+        resultado = mNetwork.escaneo_puertos(['1.1.1.1'], verbose=False)
         
         # Tu bloque 'except Exception as e:' debe capturarlo y continuar, devolviendo lista vacía
         self.assertEqual(resultado, [])
@@ -94,14 +94,14 @@ class TestNetworkModule(unittest.TestCase):
 
     @patch('modules.network.config', {'network': {'white_list': [], 'black_list': []}})
     @patch('modules.network.nmap.PortScanner')
-    def test_scaneoPuertos_sin_puertos_abiertos(self, mock_port_scanner):
+    def test_escaneo_puertos_sin_puertos_abiertos(self, mock_port_scanner):
         mock_nm = MagicMock()
         mock_port_scanner.return_value = mock_nm
         
         # Simulamos que la lista de hosts detectados está vacía
         mock_nm.all_hosts.return_value = []
         
-        resultado = mNetwork.scaneoPuertos(['1.1.1.1'], verbose=False)
+        resultado = mNetwork.escaneo_puertos(['1.1.1.1'], verbose=False)
         
         # Tu comprobación 'if len(nm.all_hosts()) == 0:' debe procesarlo y devolver vacío
         self.assertEqual(resultado, [])

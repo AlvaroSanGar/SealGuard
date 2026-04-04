@@ -16,11 +16,16 @@ def obtener_score_cvss(cve_id):
         cache_cvss[cve_id] = 0.0
         return 0.0
         
+    # Extraemos la clave del diccionario de configuración
+    api_key = config["vulnerabilities"].get("nist_api_key")
+    headers = {"apiKey": api_key} if api_key else {}
+        
     url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
     try:
-        response = requests.get(url, timeout=5)
+        # Añadimos las cabeceras (headers) a la petición GET
+        response = requests.get(url, headers=headers, timeout=5)
         
-        if response.status_code == 200: # Obtenemos los datos de la respuesta de la API y cargamos las vulns
+        if response.status_code == 200: 
             datos = response.json()
             vulnerabilidades = datos.get("vulnerabilities", [])
             
@@ -35,10 +40,12 @@ def obtener_score_cvss(cve_id):
                     score = metricas["cvssMetricV2"][0]["cvssData"]["baseScore"]
                     
                 cache_cvss[cve_id] = score
-                time.sleep(0.5) # Pausa para no saturar la API 
+                # Mantenemos la pausa para asegurar estabilidad
+                time.sleep(0.5) 
                 return score
+                
     except Exception:
-        pass # Si falla la conexión o hay timeout, evitamos que pete
+        pass
         
     cache_cvss[cve_id] = 0.0
     return 0.0

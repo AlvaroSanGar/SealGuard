@@ -122,12 +122,7 @@ hardening:
     critical_mounts: ["/", "/home", "/var"]
 
 
-# (Anexo I.1.5 - Resiliencia)
-backups: 
-  comp_crontab: true
-  comp_systemd_timers: true
-  keywords: ["backup", "rsync", "tar", "snapshot", "aws s3", "rclone"]
-
+disponibilidad: ["backup", "rsync", "aws s3", "rclone"]
 
 
 users:
