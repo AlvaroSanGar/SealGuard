@@ -7,6 +7,7 @@ from modules.hardening import ESCANER_hardening
 from modules.booting import ESCANER_booting
 from modules.availability import ESCANER_disponibilidad
 
+
 def escaneo_baseline():
     generar_baseline()
     
@@ -50,13 +51,4 @@ def escaneo_normal(verbose):
     datos_reporte["boot"] = ESCANER_booting(verbose, datos_grub)
     datos_reporte["disponibilidad"] = ESCANER_disponibilidad(verbose)
     
-    '''
-    print("\n\nRESULTADOS SISTEMA\n", datos_reporte["sistema"])
-    print("\n\nRESULTADOS DE NETWORKING\n", datos_reporte["puertos"])
-    print("\n\nRESULTADOS DE VULNERABILIDADES\n", datos_reporte["vulns"])
-    print("\n\nRESULTADOS INTEGRIDAD\n", datos_reporte["integridad"])
-    print("\n\nRESULTADOS POLITICAS\n",datos_reporte["politicas_contra"])
-    print("\n\nRESULTADOS USUARIOS\n",datos_reporte["usuarios"])
-    print("\n\nRESULTADOS 2FA\n",datos_reporte["2FA"])
-    print("\n\nRESULTADOS HARDENING\n",datos_reporte["hardening"])
-    '''    
+  
