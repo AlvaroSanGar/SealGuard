@@ -1,4 +1,4 @@
-from core.auditor import escaneo_baseline, escaneo_normal
+from core.auditor import generar_escaneo_baseline, escaneo_normal
 
 if __name__ == "__main__":
     print("\n==================================================")
@@ -7,7 +7,7 @@ if __name__ == "__main__":
     baseline = False
     verbose = True
     if baseline:
-        escaneo_baseline()
+        generar_escaneo_baseline()
     else:
         escaneo_normal(verbose)
     print("\n\n--- [ FIN DEL ESCANEO ] ---\n")

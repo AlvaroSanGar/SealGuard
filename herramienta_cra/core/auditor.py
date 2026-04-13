@@ -6,10 +6,41 @@ from modules.users import ESCANER_usuarios
 from modules.hardening import ESCANER_hardening
 from modules.booting import ESCANER_booting
 from modules.availability import ESCANER_disponibilidad
+import core.operadorBBDD as opBBDD
+import core.report_generator as pdf
+import json
 
 
-def escaneo_baseline():
-    generar_baseline()
+def generar_escaneo_baseline():
+    archivo = generar_baseline()
+    if archivo:
+        opBBDD.insertar_elemento(archivo, "baseline")
+
+
+
+
+
+
+def asignar_escaneo_baseline(id):
+    print("[+] Asignando el nuevo archivo baseline (id "+str(id)+")")
+    archivo = opBBDD.obtener_elemento(id, "baseline")
+    if archivo:
+        try:
+            with open('history/escaneo_baseline.json', 'w') as f:
+                json.dump(archivo, f)
+            print("[-] El archivo baseline se ha asignado con éxito\n")
+            return 
+    
+        except Exception as e:
+            print("[ERROR] No se ha podido asignar el archivo baseline: "+str(e))
+            return
+    print("[ERROR] No se ha podido obtener el archivo baseline indicado")
+
+
+
+
+
+
     
 def escaneo_normal(verbose):
     
@@ -50,5 +81,6 @@ def escaneo_normal(verbose):
     
     datos_reporte["boot"] = ESCANER_booting(verbose, datos_grub)
     datos_reporte["disponibilidad"] = ESCANER_disponibilidad(verbose)
+    opBBDD.insertar_elemento(datos_reporte, "reportes")
     
   
