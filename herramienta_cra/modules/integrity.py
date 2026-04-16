@@ -66,7 +66,7 @@ def generar_baseline():
         with open('history/escaneo_baseline.json', 'w') as f:
             json.dump(baseline, f)
         print("[-] El archivo baseline se ha generado con éxito\n")
-        return f
+        return baseline
     
     except Exception as e:
         print("[ERROR] No se ha podido generar el archivo baseline: "+str(e))

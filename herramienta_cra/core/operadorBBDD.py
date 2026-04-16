@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import json  
-from datetime import datetime 
+
 
 DDBB_path = 'history/BBDD-local.db'
 
@@ -119,7 +119,7 @@ def mostrar_tabla(tabla):
 
 
 ########### INSERTAR ELEMENTO ######################################################################
-def insertar_elemento(archivo, tipo):
+def insertar_elemento(archivo, tipo, fecha_actual):
     # Comprobamos si la BBDD existe
     if not os.path.exists(DDBB_path):
         print("[ERROR] No se ha encontrado la BBDD en "+str(DDBB_path))
@@ -129,9 +129,6 @@ def insertar_elemento(archivo, tipo):
     if not tipo in ["reportes", "baseline"]:
         print("[ERROR] El tipo de archivo no cuadra con los estimados")
         return 
-    
-    # Obtenemos la fecha y hora 
-    fecha_actual = datetime.now().strftime("%Y/%m/%d %H:%M")
     
     # Comprobamos que el archivo tiene un formato valido (JSON)
     if isinstance(archivo, (dict, list)):
@@ -152,10 +149,10 @@ def insertar_elemento(archivo, tipo):
         # Usamos execute con parámetros (?, ?) para evitar que las comillas del JSON rompan el SQL
         query = "INSERT INTO "+str(tipo)+" (fecha, "+str(columna_datos)+") VALUES (?, ?)"
         cursor.execute(query, (fecha_actual, datos_json))
-
+        
         con.commit()
         print("[i] Datos insertados con éxito en la tabla '"+str(tipo)+"'")
-
+        
     except Exception as e:
         print("[ERROR] Se ha producido un error durante la inserción en la BBDD: "+str(e))
 
@@ -202,6 +199,7 @@ def obtener_elemento(id_obj, tabla):
 
     if tabla not in ["reportes", "baseline"]:   
         print("[ERROR] La tabla indicada no existe")
+        return None
     
     # Seleccionamos el nombre de la columna
     if tabla == "reportes":
@@ -230,6 +228,7 @@ def obtener_elemento(id_obj, tabla):
         except Exception as e:
             # No hacemos nada 
             print("[ERROR] No se han podido obtener los datos del archivo JSON: "+str(e))
+            diccionario_datos = datos_raw
 
         # Devolvemos una estructura limpia y estandarizada para el generador de PDFs
         return {
@@ -278,3 +277,20 @@ def borrar_elemento(id_obj, tabla):
     finally:
         if con:
             con.close()
+            
+
+######### SELECCIONAR BASELINE ################################################
+def seleccionar_baseline(id):
+    print("[+] Asignando el nuevo archivo baseline (id "+str(id)+")")
+    archivo = obtener_elemento(id, "baseline")
+    if archivo:
+        try:
+            with open('history/escaneo_baseline.json', 'w') as f:
+                json.dump(archivo["datos"], f)
+            print("[-] El archivo baseline se ha asignado con éxito\n")
+            return 
+    
+        except Exception as e:
+            print("[ERROR] No se ha podido asignar el archivo baseline: "+str(e))
+            return
+    print("[ERROR] No se ha podido obtener el archivo baseline indicado")

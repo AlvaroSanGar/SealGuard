@@ -6,7 +6,7 @@ from config.settings import config
 
 ###########################################################################################################################
 def auditar_backups(verbose):
-    print("[+] Auditando políticas de copias de seguridad (Resiliencia)")
+    print("[+] Auditando políticas de copias de seguridad")
     resultados = {
         "backups_activos": False,
         "mecanismos_encontrados": [],
@@ -109,7 +109,7 @@ def auditar_backups(verbose):
 
 ##########################################################################################################################
 def auditar_protecciones_dos(verbose):
-    print("[+] Auditando protecciones del kernel contra Denegación de Servicio (DoS)")
+    print("[+] Auditando protecciones del kernel contra Denegación de Servicio")
     resultados = {
         "estado": "PELIGROSO",
         "tcp_syncookies": False,
@@ -349,7 +349,7 @@ def ESCANER_disponibilidad(verbose):
     }
     
     print("\n--- [ FASE 7: AUDITORÍA DE DISPONIBILIDAD ] ---")
-    print("[+] Iniciando módulo de disponibilidad...")
+    print("[+] Iniciando módulo de disponibilidad")
     
     datos_reporte["backups"] = auditar_backups(verbose)
     datos_reporte["protecciones_dos"] = auditar_protecciones_dos(verbose)

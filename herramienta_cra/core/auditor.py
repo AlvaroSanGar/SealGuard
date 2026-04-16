@@ -7,34 +7,69 @@ from modules.hardening import ESCANER_hardening
 from modules.booting import ESCANER_booting
 from modules.availability import ESCANER_disponibilidad
 import core.operadorBBDD as opBBDD
-import core.report_generator as pdf
-import json
+from core.report_generator import generar_informe
+from datetime import datetime 
+
+
+
+def seleccionar(mode, verbose):
+    # Comprobamos si la BBDD
+    if not opBBDD.comp_BBDD():
+        opBBDD.crear_BBDD()
+        
+    match mode:
+        case "scan":
+            escaneo_normal(verbose)
+        
+        case "baseline":
+            generar_escaneo_baseline()
+
+        case "configure":
+            opBBDD.mostrar_tabla("baseline")
+            id_str = input("[i] Seleccione el id del nuevo archivo baseline o pulse la tecla 'Q' para salir: ")
+            if id_str.lower() != 'q':
+                try:
+                    id_baseline = int(id_str)
+                    opBBDD.seleccionar_baseline(id_baseline)
+                except ValueError:
+                    print("[ERROR] Debes introducir ID válido.")
+        
+        case "recover":
+            # [MODIFICADO] Lógica completa para recuperar un informe y pasarlo al PDF
+            opBBDD.mostrar_tabla("reportes")
+            id_str = input("[i] Seleccione el id del reporte que desea generar o pulse la tecla 'Q' para salir: ")
+            if id_str.lower() != 'q':
+                try:
+                    id_reporte = int(id_str)
+                    reporte = opBBDD.obtener_elemento(id_reporte, "reportes")
+                    if reporte:
+                        print("[+] Reporte "+str(id_reporte)+" recuperado, generando PDF")
+                        generar_informe(reporte["fecha"], reporte["datos"]) 
+                    else:
+                        # Si devuelve None es porque no existe
+                        print("[ERROR] No existe ningún reporte con el ID "+str(id_reporte))
+                except ValueError:
+                    print("[ERROR] Introduzca un ID válido")
+            
+        case "history":
+            opBBDD.mostrar_tabla("baseline")
+            opBBDD.mostrar_tabla("reportes")        
+        
+    print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
+
+
+
+
+
+
 
 
 def generar_escaneo_baseline():
     archivo = generar_baseline()
     if archivo:
-        opBBDD.insertar_elemento(archivo, "baseline")
-
-
-
-
-
-
-def asignar_escaneo_baseline(id):
-    print("[+] Asignando el nuevo archivo baseline (id "+str(id)+")")
-    archivo = opBBDD.obtener_elemento(id, "baseline")
-    if archivo:
-        try:
-            with open('history/escaneo_baseline.json', 'w') as f:
-                json.dump(archivo, f)
-            print("[-] El archivo baseline se ha asignado con éxito\n")
-            return 
-    
-        except Exception as e:
-            print("[ERROR] No se ha podido asignar el archivo baseline: "+str(e))
-            return
-    print("[ERROR] No se ha podido obtener el archivo baseline indicado")
+        # Calculamos la fecha 
+        fecha_actual = datetime.now().strftime("%Y/%m/%d %H:%M")
+        opBBDD.insertar_elemento(archivo, "baseline", fecha_actual)
 
 
 
@@ -81,6 +116,11 @@ def escaneo_normal(verbose):
     
     datos_reporte["boot"] = ESCANER_booting(verbose, datos_grub)
     datos_reporte["disponibilidad"] = ESCANER_disponibilidad(verbose)
-    opBBDD.insertar_elemento(datos_reporte, "reportes")
     
-  
+    # Obtenemos la fecha
+    fecha_actual = datetime.now().strftime("%Y/%m/%d %H:%M")
+    opBBDD.insertar_elemento(datos_reporte, "reportes", fecha_actual)
+    
+    # Generamos el PDF
+    print("\n[+] Escaneo finalizado correctamente, generando PDF")
+    generar_informe(fecha_actual, datos_reporte)
