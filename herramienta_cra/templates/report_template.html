@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Auditoría CRA</title>
+    <link rel="stylesheet" href="styles.css">
+    <style> @page { string-set: report-id "{{ id }}"; } </style>
+</head>
+<body>
+
+    <div class="cover-page">
+        <div class="logo-container">
+            <img src="logo.jpg" alt="Logo Herramienta CRA">
+        </div>
+        
+        <h1 class="cover-title">Informe de Auditoría Técnica</h1>
+        <h2 class="cover-subtitle">Evaluación de Cumplimiento: Ley de Ciberresiliencia (CRA)</h2>
+        
+        <div class="cover-details">
+            <h3 style="color: #0A2540; margin-top: 0;">Detalles del Escaneo</h3>
+            <table class="data-table" style="margin-top:0; border: none;">
+                <tr><th style="width: 35%;">ID de Auditoría:</th><td>#{{ id }}</td></tr>
+                <tr><th>Fecha de Ejecución:</th><td>{{ fecha }}</td></tr>
+                <tr><th>Hostname Objetivo:</th><td>{{ datos.sistema.hostname | default('Desconocido') }}</td></tr>
+                <tr><th>Sistema Operativo:</th><td>{{ datos.sistema.dist }} {{ datos.sistema.version }}</td></tr>
+                <tr><th>Arquitectura:</th><td>{{ datos.sistema.arquitectura }}</td></tr>
+                <tr><th>Motor de Auditoría:</th><td>Python Automated Scanner (UCLM TFG)</td></tr>
+            </table>
+        </div>
+    </div>
+    <div style="page-break-before: always;">
+        <h1 class="section-title" style="margin-top: 0; page-break-before: avoid;">Índice de Contenidos</h1>
+        <ul class="toc-list">
+            <li><a href="#resumen">Resumen Ejecutivo de Cumplimiento</a></li>
+            <li><a href="#anexo-1">Anexo I: Red y Vulnerabilidades</a></li>
+            <li><a href="#anexo-2">Anexo II: Identidad y Accesos</a></li>
+            <li><a href="#anexo-3">Anexo III: Hardening del Sistema</a></li>
+            <li><a href="#anexo-4">Anexo IV: Integridad y Arranque</a></li>
+            <li><a href="#anexo-5">Anexo V: Resiliencia y Disponibilidad</a></li>
+        </ul>
+    </div>
+    {% set safe_count = (1 if datos.puertos|length == 0 else 0) + 
+                        (1 if datos.vulns|length == 0 else 0) + 
+                        (1 if datos['2FA'].mfa_global or datos['2FA'].ssh_config_valido else 0) + 
+                        (1 if datos.hardening.cifrado.estado != "PELIGROSO" else 0) + 
+                        (1 if datos.boot.parametros.estado != 'PELIGROSO' else 0) + 
+                        (1 if datos.disponibilidad.backups.backups_activos else 0) %}
+    
+    {% set warn_count = (1 if datos.puertos|length > 0 else 0) + 
+                        (1 if not (datos['2FA'].mfa_global or datos['2FA'].ssh_config_valido) else 0) %}
+    
+    {% set danger_count = (1 if datos.vulns|length > 0 else 0) + 
+                          (1 if datos.hardening.cifrado.estado == "PELIGROSO" else 0) + 
+                          (1 if datos.boot.parametros.estado == 'PELIGROSO' else 0) + 
+                          (1 if not datos.disponibilidad.backups.backups_activos else 0) %}
+    
+    {% set total_controles = safe_count + warn_count + danger_count %}
+    
+    {% set safe_pct = (safe_count / total_controles * 100) if total_controles > 0 else 0 %}
+    {% set warn_pct = (warn_count / total_controles * 100) if total_controles > 0 else 0 %}
+    {% set danger_pct = (danger_count / total_controles * 100) if total_controles > 0 else 0 %}
+
+
+    <h1 id="resumen" class="section-title" style="page-break-before: avoid;">Resumen Ejecutivo de Cumplimiento</h1>
+    <p>A continuación se muestra un breve resumen de los datos obtenidos sobre el equipo, este documento facilitará la tarea de auditar un sistema siguiendo los requisitos especificados en el anexo I de la CRA.</p>
+    
+    <table class="summary-layout-table">
+        <tr>
+            <td class="summary-col-left">
+                <h2 class="subsection-title">Información del Sistema</h2>
+                <table class="data-table">
+                    <tr>
+                        <th>Hostname</th>
+                        <td>{{ datos.sistema.hostname }}</td>
+                    </tr>
+                    <tr>
+                        <th>Sistema OS</th>
+                        <td>{{ datos.sistema.dist }} {{ datos.sistema.version }}</td>
+                    </tr>
+                    <tr>
+                        <th>Kernel</th>
+                        <td>{{ datos.sistema.kernel }}</td>
+                    </tr>
+                    <tr>
+                        <th>Arquitectura</th>
+                        <td>{{ datos.sistema.arquitectura }}</td>
+                    </tr>
+                </table>
+            </td>
+            
+            <td class="summary-col-right">
+                <h3 class="chart-title">Estado Global</h3>
+                
+                <svg width="140" height="140" viewBox="0 0 42 42" class="donut-chart">
+                    <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#ecf0f1" stroke-width="5"></circle>
+                    
+                    <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#27ae60" stroke-width="5"
+                            stroke-dasharray="{{ safe_pct }} {{ 100 - safe_pct }}" stroke-dashoffset="25"></circle>
+                    
+                    <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f39c12" stroke-width="5"
+                            stroke-dasharray="{{ warn_pct }} {{ 100 - warn_pct }}" stroke-dashoffset="{{ 25 - safe_pct }}"></circle>
+                    
+                    <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#e74c3c" stroke-width="5"
+                            stroke-dasharray="{{ danger_pct }} {{ 100 - danger_pct }}" stroke-dashoffset="{{ 25 - safe_pct - warn_pct }}"></circle>
+                    
+                    <text x="21" y="20" text-anchor="middle" font-size="8" font-family="sans-serif" font-weight="bold" fill="#0A2540">{{ total_controles }}</text>
+                    <text x="21" y="26" text-anchor="middle" font-size="3.5" font-family="sans-serif" fill="#7f8c8d">Controles</text>
+                </svg>
+
+                <div class="chart-legend">
+                    <span class="text-safe">●</span> Seguros: <strong>{{ safe_count }}</strong><br>
+                    <span class="text-warn">●</span> Advertencias: <strong>{{ warn_count }}</strong><br>
+                    <span class="text-danger">●</span> Críticos: <strong>{{ danger_count }}</strong>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="data-table matrix-table">
+        <tr>
+            <th>Módulo de Evaluación</th>
+            <th>Métrica Principal</th>
+            <th class="text-center">Estado General</th>
+        </tr>
+        <tr>
+            <td class="module-name">1. Exposición de Red</td>
+            <td>Puertos expuestos</td>
+            <td class="text-center">
+                {% if datos.puertos | length > 0 %}<span class="badge bg-warning">RIESGO POTENCIAL</span>{% else %}<span class="badge bg-safe">SEGURO</span>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="module-name">2. Vulnerabilidades</td>
+            <td>CVEs en paquetes instalados</td>
+            <td class="text-center">
+                {% if datos.vulns | length > 0 %}<span class="badge bg-danger">NO CUMPLE</span>{% else %}<span class="badge bg-safe">SEGURO</span>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="module-name">3. Integridad del Sistema</td>
+            <td>Modificación de binarios críticos</td>
+            <td class="text-center"><span class="badge bg-info">AUDITADO</span></td>
+        </tr>
+        <tr>
+            <td class="module-name">4. Identidad y Accesos</td>
+            <td>Políticas PAM y Contraseñas</td>
+            <td class="text-center">
+                {% if datos['2FA'].mfa_global or datos['2FA'].ssh_config_valido %}<span class="badge bg-safe">CUMPLE</span>{% else %}<span class="badge bg-warning">MEJORABLE</span>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="module-name">5. Hardening General</td>
+            <td>Criptografía, MAC y Firewall</td>
+            <td class="text-center">
+                {% if datos.hardening.cifrado.estado == "PELIGROSO" %}<span class="badge bg-danger">RIESGO DISCO</span>{% else %}<span class="badge bg-safe">AUDITADO</span>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="module-name">6. Arranque Seguro</td>
+            <td>Integridad del Bootloader</td>
+            <td class="text-center">
+                {% if datos.boot.parametros.estado == 'PELIGROSO' %}<span class="badge bg-danger">PELIGRO</span>{% else %}<span class="badge bg-safe">SEGURO</span>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="module-name">7. Resiliencia (Disponibilidad)</td>
+            <td>Backups y Prevención DoS</td>
+            <td class="text-center">
+                {% if datos.disponibilidad.backups.backups_activos %}<span class="badge bg-safe">CUMPLE</span>{% else %}<span class="badge bg-danger">INCUMPLIMIENTO</span>{% endif %}
+            </td>
+        </tr>
+    </table>
+
+
+    <h1 id="anexo-1" class="section-title">Anexo I: Red y Vulnerabilidades</h1>
+    
+    <h2 class="subsection-title">1. Exposición de Servicios (Networking)</h2>
+
+    {% if datos.puertos | length > 0 %}
+        {% for grupo in datos.puertos | groupby('ip') %}
+            
+            <div class="interface-header">
+                <strong>Dirección IP / Interfaz:</strong> {{ grupo.grouper }}
+            </div>
+            
+            <table class="data-table table-interface">
+                <tr>
+                    <th style="width: 15%;">Puerto</th>
+                    <th style="width: 30%;">Servicio y Detalles</th>
+                    <th style="width: 15%;">Estado</th>
+                    <th style="width: 25%;">Motivo</th>
+                    <th style="width: 15%;">Peligro</th>
+                </tr>
+                
+                {% for puerto in grupo.list %}
+                <tr>
+                    <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
+                    <td>{{ puerto.detalle }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.estado }}
+                        </span>
+                    </td>
+                    
+                    <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.peligro }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            
+        {% endfor %}
+    {% else %}
+        <div class="success-box">
+            <strong>[✓] Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
+        </div>
+    {% endif %}
+
+<h2 class="subsection-title">2. Gestión de Vulnerabilidades (CVEs)</h2>
+    <div class="info-box">Total de paquetes escaneados: {{ datos.paquetes.apt + datos.paquetes.pip }} (APT y PIP).</div>
+    
+    <table class="data-table">
+        <tr>
+            <th class="col-w-20">Paquete Afectado</th>
+            <th class="col-w-15">Versión</th>
+            <th class="col-w-15">Entorno</th>
+            <th class="col-w-50">Vulnerabilidades (ID y Score CVSS)</th>
+        </tr>
+        {% for vuln in datos.vulns %}
+        <tr>
+            <td><strong>{{ vuln.paquete }}</strong></td>
+            <td>{{ vuln.version }}</td>
+            <td>{{ vuln.tipo }}</td>
+            <td>
+                <span class="badge bg-danger mb-sm">{{ vuln.cantidad }} CVEs Detectados</span><br>
+                
+                <div class="vuln-list-container">
+                    {% for cve in vuln.cves[:5] %}
+                        • <strong>{{ cve.id }}</strong> 
+                        
+                        <span class="{% if cve.score >= 9.0 %}cvss-critical{% elif cve.score >= 7.0 %}cvss-high{% else %}cvss-medium{% endif %}">
+                            (CVSS: {{ cve.score }})
+                        </span><br>
+                    {% endfor %}
+                    
+                    {% if vuln.cves | length > 5 %}
+                        <span class="vuln-omitted-text">
+                            ...y {{ vuln.cves | length - 5 }} vulnerabilidades más omitidas.
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center">El sistema se encuentra parcheado. No hay vulnerabilidades de alto riesgo.</td></tr>
+        {% endfor %}
+    </table>
+
+
+      <!-- ANEXO 2 -->
+    <h1 id="anexo-2" class="section-title">Anexo II: Identidad y Accesos</h1>
+    <h2 class="subsection-title">3. Políticas generales de usuarios (/etc/login.defs)</h2>
+    
+    <table class="data-table">
+        <tr>
+            <th class="col-w-50">Directiva de Seguridad</th>
+            <th class="col-w-50">Valor Configurado</th>
+        </tr>
+        
+        {% for clave, valor in datos.politicas_contra.items() %}
+        <tr>
+            <td><strong class="font-mono">{{ clave }}</strong></td>
+            <td>{{ valor }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2" class="text-center">No se han podido extraer las políticas de /etc/login.defs</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    
+    <h2 class="subsection-title">4. Auditoría de Usuarios Relevantes</h2>
+    
+    <table class="data-table text-xs">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>UID</th>
+                <th>Descripción</th>
+                <th class="col-path">Directorio</th>
+                <th>Shell</th>
+                <th>Grupos Críticos</th>
+                <th>GID</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usu in datos.usuarios %}
+            <tr>
+                <td><strong>{{ usu.username }}</strong></td>
+                <td>{{ usu.uid }}</td>
+                <td class="col-desc">{{ usu.description | default('-') }}</td>
+                <td class="col-path">{{ usu.directory }}</td>
+                <td><code>{{ usu.shell }}</code></td>
+                <td>
+                    {% for grupo in usu.grupos_criticos %}
+                        <span class="badge-group">{{ grupo }}</span>
+                    {% else %}
+                        <span style="color: #999;">Ninguno</span>
+                    {% endfor %}
+                </td>
+                <td>{{ usu.gid }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="subsection-title">4.1. Políticas de caducidad individuales (Shadow)</h2>
+    <p class="text-xs" style="margin-bottom: 10px;">Valores extraídos del archivo <code>/etc/shadow</code> para los usuarios listados anteriormente.</p>
+
+    <table class="data-table text-xs">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Expire</th>
+                <th>Max</th>
+                <th>Min</th>
+                <th>Warning</th>
+                <th>Last Change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usu in datos.usuarios %}
+            <tr>
+                <td><strong>{{ usu.username }}</strong></td>
+                <td>{{ usu.politica.expire if usu.politica.expire != -1 else 'Nunca' }}</td>
+                <td>{{ usu.politica.max if usu.politica.max != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.min if usu.politica.min != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.warning if usu.politica.warning != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.last_change | default('Desconocido') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+    <h2 class="subsection-title">4. Autenticación Multifactor (2FA)</h2>
+    {% if datos['2FA'].mfa_global %}
+        <div class="success-box"><strong>MFA Global:</strong> Se han detectado módulos PAM de doble factor en la configuración base (common-auth).</div>
+    {% else %}
+        <div class="alert-box"><strong>MFA Global:</strong> No hay configuración 2FA activa a nivel de sistema.</div>
+    {% endif %}
+
+    <h2 class="subsection-title">5. Auditoría de Usuarios Relevantes</h2>
+    <table class="data-table">
+        <tr><th>Usuario (UID)</th><th>Shell</th><th>Grupos Críticos</th><th>Expiración Pass</th></tr>
+        {% for usu in datos.usuarios %}
+        <tr>
+            <td><strong>{{ usu.username }}</strong> ({{ usu.uid }})</td>
+            <td>{{ usu.shell }}</td>
+            <td>{% if usu.grupos_criticos %}<span class="badge bg-danger">{{ usu.grupos_criticos | join(', ') }}</span>{% else %}-{% endif %}</td>
+            <td>{{ usu.politica.max | default('No def') }} días</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+
+    <h1 id="anexo-3" class="section-title">Anexo III: Hardening del Sistema</h1>
+
+    <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
+    <ul>
+        <li><strong>MAC (AppArmor/SELinux):</strong> 
+            {% if datos.hardening.mac.estado == 'SEGURO' %}
+                <span class="badge bg-safe">{{ datos.hardening.mac.mac_activo }} ACTIVO</span>
+            {% else %}
+                <span class="badge bg-danger">INACTIVO</span>
+            {% endif %}
+        </li>
+        <li><strong>Protección ASLR (Kernel):</strong> Nivel {{ datos.hardening.kernel_aslr.valor }} 
+            {% if datos.hardening.kernel_aslr.estado == 'SEGURO' %}<span class="badge bg-safe">SEGURO</span>{% else %}<span class="badge bg-danger">PELIGROSO</span>{% endif %}
+        </li>
+    </ul>
+
+    <h2 class="subsection-title">7. Firewall y Criptografía</h2>
+    <div class="info-box">
+        <strong>Estado del Firewall:</strong> {{ datos.hardening.firewall.firewall_activo }}<br>
+        {% for alerta in datos.hardening.firewall.alertas %}
+            <span style="color:#e74c3c;">[!] {{ alerta }}</span><br>
+        {% endfor %}
+    </div>
+
+    <div class="info-box">
+        <strong>Cifrado de Discos (FDE/LUKS):</strong> 
+        {% if datos.hardening.cifrado.estado == 'SEGURO' %}<span class="badge bg-safe">SEGURO</span>{% else %}<span class="badge bg-danger">VULNERABLE</span>{% endif %}
+        <ul>
+            {% for alerta in datos.hardening.cifrado.alertas %}<li>{{ alerta }}</li>{% endfor %}
+            {% for det in datos.hardening.cifrado.detalles %}<li>{{ det }}</li>{% endfor %}
+        </ul>
+    </div>
+
+
+    <h2 class="subsection-title">8. Permisos de Archivos Críticos</h2>
+    <table class="data-table">
+        <tr><th>Ruta del Archivo</th><th>Estado</th><th>Detalles / Problemas</th></tr>
+        {% for archivo in datos.hardening.archivos_criticos %}
+        <tr>
+            <td><strong>{{ archivo.archivo }}</strong></td>
+            <td>
+                {% if archivo.estado == 'SEGURO' %}<span class="badge bg-safe">OK</span>
+                {% elif archivo.estado == 'NO ENCONTRADO' %}<span class="badge bg-warning">MISSING</span>
+                {% else %}<span class="badge bg-danger">RIESGO</span>{% endif %}
+            </td>
+            <td>
+                {% if archivo.problemas is string %}{{ archivo.problemas }}{% else %}{{ archivo.problemas | join(', ') }}{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+
+    <h1 id="anexo-4" class="section-title">Anexo IV: Integridad y Arranque</h1>
+
+    <h2 class="subsection-title">9. Monitorización de Integridad (Baseline)</h2>
+    <table class="data-table">
+        <tr><th>Archivo Monitoreado</th><th>Estado de Integridad</th></tr>
+        {% for archivo in datos.integridad %}
+        <tr>
+            <td>{{ archivo.archivo }}</td>
+            <td>
+                {% if archivo.estado == 'INTACTO' %}<span class="badge bg-safe">INTACTO</span>
+                {% elif archivo.estado == 'NO_RASTREADO' %}<span class="badge bg-warning">NUEVO EN SISTEMA</span>
+                {% else %}<span class="badge bg-danger">{{ archivo.estado }}</span>{% endif %}
+                
+                {% if archivo.detalle_cambio %}<br><span style="font-size: 8pt; color: #e74c3c;">Cambio en: {{ archivo.detalle_cambio }}</span>{% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="text-center">No se detectó un archivo baseline (history/escaneo_baseline.json).</td></tr>
+        {% endfor %}
+    </table>
+
+    <h2 class="subsection-title">10. Arranque Seguro (Booting)</h2>
+    <table class="data-table">
+        <tr><th>Vector Analizado</th><th>Detalle Técnico</th></tr>
+        {% for alerta in datos.boot.integridad.alertas %}<tr><td>Integridad Firmware</td><td style="color:#e74c3c;">{{ alerta }}</td></tr>{% endfor %}
+        {% for det in datos.boot.integridad.detalles %}<tr><td>Integridad Firmware</td><td style="color:#27ae60;">{{ det }}</td></tr>{% endfor %}
+        
+        {% for alerta in datos.boot.parametros.fallos %}<tr><td>Parámetros Kernel</td><td style="color:#e74c3c;">{{ alerta }}</td></tr>{% endfor %}
+        {% for alerta in datos.boot.parametros.prohibido %}<tr><td>Parámetros Kernel</td><td style="color:#e74c3c; font-weight:bold;">{{ alerta }}</td></tr>{% endfor %}
+    </table>
+
+
+    <h1 id="anexo-5" class="section-title">Anexo V: Resiliencia y Disponibilidad</h1>
+
+    <h2 class="subsection-title">11. Prevención de Denegación de Servicio (DoS)</h2>
+    <div class="info-box">
+        <strong>Límites de Recursos (Fork Bombs):</strong> 
+        {% if datos.disponibilidad.limites_recursos.estado == 'SEGURO' %}<span class="badge bg-safe">PROTEGIDO</span>{% else %}<span class="badge bg-danger">VULNERABLE</span>{% endif %}
+        <br>
+        {% for alerta in datos.disponibilidad.limites_recursos.alertas %}<span style="color:#e74c3c;">- {{ alerta }}</span><br>{% endfor %}
+    </div>
+
+    <table class="data-table">
+        <tr><th>Protección de Red (Kernel)</th><th>Estado</th></tr>
+        <tr><td>SYN Cookies (TCP)</td><td>{% if datos.disponibilidad.protecciones_dos.tcp_syncookies %}<span class="badge bg-safe">ACTIVO</span>{% else %}<span class="badge bg-danger">INACTIVO</span>{% endif %}</td></tr>
+        <tr><td>Reverse Path Filter (IP Spoofing)</td><td>{% if datos.disponibilidad.protecciones_dos.rp_filter %}<span class="badge bg-safe">ACTIVO</span>{% else %}<span class="badge bg-danger">INACTIVO</span>{% endif %}</td></tr>
+        <tr><td>Ignorar ICMP Broadcast (Smurf Attacks)</td><td>{% if datos.disponibilidad.protecciones_dos.icmp_echo_ignore_broadcasts %}<span class="badge bg-safe">ACTIVO</span>{% else %}<span class="badge bg-danger">INACTIVO</span>{% endif %}</td></tr>
+    </table>
+
+    <h2 class="subsection-title">12. Políticas de Recuperación (Backups)</h2>
+    <table class="data-table">
+        <tr><th>Mecanismo Encontrado</th><th>Detalle / Comando</th></tr>
+        {% for mecanismo in datos.disponibilidad.backups.mecanismos_encontrados %}
+        <tr>
+            <td><span class="badge bg-info">ACTIVO</span></td>
+            <td><strong>{{ mecanismo }}</strong></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="text-center" style="color:#e74c3c;"><strong>[!] RIESGO CRÍTICO: No se detectaron políticas automáticas de Backup.</strong></td></tr>
+        {% endfor %}
+    </table>
+
+    <p style="text-align: center; margin-top: 50px; font-size: 8pt; color: #7f8c8d;">
+        -- Fin del Informe Oficial -- <br>
+        Generado automáticamente mediante CRA Linux Auditor
+    </p>
+
+</body>
+</html>

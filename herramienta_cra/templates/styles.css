@@ -1,0 +1,264 @@
+/* styles.css */
+@page {
+    size: A4;
+    margin: 2cm;
+    @bottom-right {
+        content: "Página " counter(page) " de " counter(pages);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 9pt;
+        color: #7f8c8d;
+    }
+    @bottom-left {
+        content: "CRA Linux Auditor - ID: " string(report-id);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 9pt;
+        color: #7f8c8d;
+    }
+}
+
+body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #2c3e50;
+    line-height: 1.5;
+    font-size: 10pt;
+}
+
+:root {
+    --navy-blue: #0A2540;
+    --primary-blue: #0066CC;
+    --light-blue: #E6F0FA;
+    --bg-gray: #f8fbfe;
+    --border-gray: #bdc3c7;
+}
+
+/* Portada */
+.cover-page {
+    text-align: center;
+    margin-top: 80px;
+    height: 800px;
+}
+
+.logo-container {
+    margin-bottom: 40px;
+}
+
+.logo-container img {
+    max-width: 280px; /* Tamaño del logo ajustado */
+    height: auto;
+}
+
+.cover-title { 
+    font-size: 32pt; 
+    color: var(--navy-blue); 
+    margin-bottom: 10px; 
+    border-bottom: 3px solid var(--primary-blue); 
+    padding-bottom: 15px;
+    display: inline-block;
+}
+.cover-subtitle { font-size: 16pt; color: #7f8c8d; margin-bottom: 50px; font-weight: normal; }
+.cover-details { margin-top: 80px; text-align: left; background: var(--bg-gray); padding: 30px; border-radius: 8px; border: 1px solid var(--border-gray); }
+
+/* Títulos y Secciones */
+h1.section-title {
+    color: var(--navy-blue);
+    font-size: 18pt;
+    margin-top: 40px;
+    border-bottom: 2px solid var(--primary-blue);
+    padding-bottom: 8px;
+    page-break-before: always; 
+}
+
+h2.subsection-title {
+    color: var(--primary-blue);
+    font-size: 14pt;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    border-bottom: 1px dashed #ecf0f1;
+    padding-bottom: 5px;
+}
+
+/* Tablas */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 25px; font-size: 9pt; }
+.data-table th { background-color: var(--navy-blue); color: white; text-align: left; padding: 10px; }
+.data-table td { padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }
+.data-table tr:nth-child(even) { background-color: var(--bg-gray); }
+
+/* Matriz de Cumplimiento (Resumen) */
+.matrix-table th { background-color: #34495e; }
+.matrix-table td.module-name { font-weight: bold; width: 40%; }
+
+/* Cajas de Info/Alertas */
+.info-box { background: var(--bg-gray); border-left: 4px solid var(--primary-blue); padding: 15px; margin-bottom: 20px; }
+.alert-box { background: #fdf2e9; border-left: 4px solid #e74c3c; padding: 15px; margin-bottom: 20px; }
+.success-box { background: #e9f7ef; border-left: 4px solid #27ae60; padding: 15px; margin-bottom: 20px; }
+
+/* Badges */
+.badge { padding: 4px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold; color: white; display: inline-block; text-transform: uppercase; }
+.bg-danger { background-color: #e74c3c; }   
+.bg-warning { background-color: #f39c12; }  
+.bg-safe { background-color: #27ae60; }     
+.bg-info { background-color: var(--primary-blue); } 
+
+.text-center { text-align: center; }
+ul { margin-top: 5px; padding-left: 20px; }
+
+/* --- ESTILOS DEL ÍNDICE --- */
+.toc-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 30px;
+}
+
+.toc-list li {
+    margin-bottom: 15px;
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+.toc-list a {
+    text-decoration: none;
+    color: var(--navy-blue);
+}
+
+/* Magia de WeasyPrint: Pone los puntitos y el número de página automáticamente */
+.toc-list a::after {
+    content: leader('.') target-counter(attr(href), page);
+    color: #7f8c8d;
+    font-weight: normal;
+}
+
+
+.summary-layout-table {
+    width: 100%;
+    border: none;
+    margin-bottom: 30px;
+}
+
+.summary-col-left {
+    width: 60%;
+    vertical-align: top;
+    padding-right: 20px;
+}
+
+/* Quitamos el margen superior al título para que alinee bien */
+.summary-col-left .subsection-title {
+    margin-top: 0;
+}
+
+.summary-col-right {
+    width: 40%;
+    text-align: center;
+    vertical-align: top;
+    background: var(--bg-gray);
+    border-radius: 8px;
+    border: 1px solid var(--border-gray);
+    padding: 15px;
+}
+
+.chart-title {
+    color: var(--navy-blue);
+    margin-top: 0;
+    font-size: 12pt;
+}
+
+.donut-chart {
+    margin: 10px auto;
+    display: block;
+}
+
+.chart-legend {
+    font-size: 9pt;
+    text-align: left;
+    padding-left: 20px;
+}
+
+/* Colores de texto para la leyenda */
+.text-safe { color: #27ae60; }
+.text-warn { color: #f39c12; }
+.text-danger { color: #e74c3c; }
+
+/* --- ESTILOS PARA LAS INTERFACES DE RED --- */
+.interface-header {
+    background-color: var(--light-blue);
+    color: var(--navy-blue);
+    padding: 10px 15px;
+    border-left: 5px solid var(--primary-blue);
+    margin-top: 30px;
+    margin-bottom: 0; /* Pegado a la tabla */
+    font-size: 12pt;
+    border-radius: 4px 4px 0 0;
+}
+
+/* Ajuste para la tabla que va debajo de la cabecera de interfaz */
+.table-interface {
+    margin-top: 0;
+    border-top: none;
+}
+
+/* --- GESTIÓN DE VULNERABILIDADES (CVEs) --- */
+
+/* Anchos de columnas para las tablas */
+.col-w-15 { width: 15%; }
+.col-w-20 { width: 20%; }
+.col-w-50 { width: 50%; }
+
+/* Espaciado pequeño para badges */
+.mb-sm { margin-bottom: 6px; }
+
+/* Contenedor de la lista de CVEs */
+.vuln-list-container {
+    font-size: 8pt;
+    color: #444;
+    line-height: 1.5;
+}
+
+/* Colores dinámicos por severidad CVSS */
+.cvss-critical {
+    color: #c0392b; /* Rojo oscuro */
+    font-weight: bold;
+}
+
+.cvss-high {
+    color: #e74c3c; /* Rojo estándar */
+    font-weight: bold;
+}
+
+.cvss-medium {
+    color: #f39c12; /* Naranja */
+    font-weight: bold;
+}
+
+/* Texto de omisión de vulnerabilidades */
+.vuln-omitted-text {
+    color: #7f8c8d;
+    font-style: italic;
+    margin-top: 4px;
+    display: block;
+}
+
+
+
+/* --- TABLAS DE USUARIOS --- */
+.text-xs {
+    font-size: 8pt;
+}
+
+.col-path {
+    word-break: break-all; /* Para que las rutas largas no rompan la tabla */
+    max-width: 150px;
+}
+
+.col-desc {
+    font-style: italic;
+    color: #666;
+}
+
+.badge-group {
+    background-color: #f1f4f9;
+    color: var(--navy-blue);
+    border: 1px solid var(--border-gray);
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-right: 2px;
+    white-space: nowrap;
+}

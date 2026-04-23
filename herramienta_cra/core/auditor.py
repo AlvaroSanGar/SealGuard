@@ -35,7 +35,6 @@ def seleccionar(mode, verbose):
                     print("[ERROR] Debes introducir ID válido.")
         
         case "recover":
-            # [MODIFICADO] Lógica completa para recuperar un informe y pasarlo al PDF
             opBBDD.mostrar_tabla("reportes")
             id_str = input("[i] Seleccione el id del reporte que desea generar o pulse la tecla 'Q' para salir: ")
             if id_str.lower() != 'q':
@@ -53,7 +52,10 @@ def seleccionar(mode, verbose):
             
         case "history":
             opBBDD.mostrar_tabla("baseline")
-            opBBDD.mostrar_tabla("reportes")        
+            opBBDD.mostrar_tabla("reportes") 
+            
+        case "delete":
+            opBBDD.borrar_BBDD()       
         
     print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
 

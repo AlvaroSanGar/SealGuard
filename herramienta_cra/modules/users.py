@@ -200,19 +200,25 @@ def comp_2FA(verbose, usuarios):
         
     
     ################## Comprobamos si el servicio sshd tiene 2fa ###########################################################
-    comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
-    if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
+    if os.path.exists("/etc/ssh"):
+        comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
+        if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
+            reporte_2fa["ssh_config_valido"] = True
+            if verbose:
+                print("     [i] Configuración de SSH válida para aplicar MFA")
+        elif verbose:
+            print("     [X] Configuración de SSH no válida para aplicar MFA")
+    
+    else:
         reporte_2fa["ssh_config_valido"] = True
         if verbose:
-            print("     [i] Configuración de SSH válida para aplicar MFA")
-    elif verbose:
-        print("     [X] Configuración de SSH no válida para aplicar MFA")
+            print("     [V] No se ha detectado el servicio SSHinstalado en el sistema, por lo que se considera seguro")
     
     
 
     ################# Comprobamos la existencia de los tokens de autentificación en los dir de cada usu #####################
     if verbose:
-        print(f"     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
+        print("     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
     
     # Cargamos los módulos activos para después comprobar si los tokens pertenecen a uno de los servicios activos 
     # Lo hacemos en un set para evitar duplicados al reoger los servicios activos de 'detalles'
@@ -243,7 +249,7 @@ def comp_2FA(verbose, usuarios):
                     
                     if verbose:
                         if token_efectivo:
-                            print("         - [OK] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
+                            print("         - [V] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
                         else:
                             print("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
                             
@@ -282,7 +288,7 @@ def ESCANER_usuarios(verbose):
     }
     
     print("\n--- [ FASE 4: AUDITORÍA DE USUARIOS ] ---")
-    print("[+] Iniciando módulo de escaneo de usuarios...")
+    print("[+] Iniciando módulo de escaneo de usuarios")
     resultados["politicas"] = politicas_passwords(verbose)
     
     #Comprobamos si hay definido un min uid para los usuarios personas en las políticas, de lo contrario ponemos 1000
