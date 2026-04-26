@@ -58,6 +58,108 @@ body {
 .cover-subtitle { font-size: 16pt; color: #7f8c8d; margin-bottom: 50px; font-weight: normal; }
 .cover-details { margin-top: 80px; text-align: left; background: var(--bg-gray); padding: 30px; border-radius: 8px; border: 1px solid var(--border-gray); }
 
+
+/* --- LAYOUT DEL RESUMEN EJECUTIVO --- */
+.summary-layout-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+    margin-bottom: 30px;
+}
+
+.summary-layout-table td {
+    border: none;
+    vertical-align: top;
+}
+
+.summary-col-left {
+    width: 60%;
+    padding-right: 25px;
+}
+
+.summary-col-right {
+    width: 40%;
+}
+
+/* --- UTILIDADES DE ESPACIADO --- */
+.mt-0 { margin-top: 0 !important; }
+.col-w-35 { width: 35%; }
+
+.summary-title-top {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.summary-title-mid {
+    margin-top: 25px;
+    margin-bottom: 10px;
+}
+
+/* --- TARJETA DE ESTADO GLOBAL Y GRÁFICO --- */
+.summary-card {
+    text-align: center;
+    background: #f8fbfe;
+    border: 1px solid #bdc3c7;
+    border-radius: 12px;
+    padding: 25px;
+}
+
+.summary-card h3 {
+    margin-top: 0;
+    color: #1f2937;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 10px;
+    font-size: 14pt;
+}
+
+.donut-container {
+    position: relative;
+    display: inline-block;
+    margin-top: 20px;
+}
+
+.donut-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.donut-number {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.donut-label {
+    font-size: 8.5pt;
+    color: #6b7280;
+}
+
+/* --- LEYENDA DEL GRÁFICO --- */
+.chart-legend-container {
+    text-align: left;
+    font-size: 10pt;
+    margin-top: 30px;
+    padding-left: 20px;
+}
+
+.legend-item {
+    margin-bottom: 8px;
+}
+
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+
+
 /* Títulos y Secciones */
 h1.section-title {
     color: var(--navy-blue);
@@ -310,4 +412,51 @@ ul { margin-top: 5px; padding-left: 20px; }
     font-size: 7.5pt;
     display: block;
     margin-top: 2px;
+}
+
+
+/* Para parámetros prohibidos */
+.bg-critical { background-color: #800000; color: #ffffff; }
+
+
+
+
+/* --- CABECERAS DE TABLA PROFESIONALES (Imagen 2) --- */
+.data-table th { 
+    background-color: #1f2937; /* Gris muy oscuro / Azul marino profundo */
+    color: white; 
+    text-align: left; 
+    padding: 10px 12px; 
+    border: none;
+}
+
+/* --- ÍNDICE DE CONTENIDOS LIMPIO --- */
+.toc-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 20px;
+    line-height: 1.6;
+}
+
+.toc-main {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 11.5pt;
+}
+
+.toc-sub {
+    margin-left: 20px;
+    font-size: 10pt;
+}
+
+.toc-list a {
+    text-decoration: none;
+    color: #1f2937; /* Quita el color azul de los links */
+}
+
+/* Los puntitos automáticos de WeasyPrint */
+.toc-list a::after {
+    content: leader('.') target-counter(attr(href), page);
+    color: #7f8c8d;
+    font-weight: normal;
 }

@@ -1,4 +1,5 @@
 import os
+import datetime
 import modules.system as mSystem
 from config.settings import config
 
@@ -76,9 +77,7 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
         usuarios_final[nombre] = u
         usuarios_final[nombre]['grupos_criticos'] = []
         usuarios_final[nombre]['politica'] = {}
-            
-    #print(str(usuarios_final)+"\n\n\n") # [DEBUG]
-    
+                
     for registro in usu_grupos_criticos or []:
         nombre = registro.get('username')
         grupo = registro.get('groupname')
@@ -98,9 +97,20 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
     # Metemos para cada usuario la política particular indicada en el shadow
     for registro in datos_shadow or []:
         nombre = registro.get('username')
+        dias_epoch = registro.get('last_change')
+        try:
+            if dias_epoch and int(dias_epoch) > 0:
+                # Sumamos los días a la fecha base 01/01/1970
+                fecha = datetime.date(1970, 1, 1) + datetime.timedelta(days=int(dias_epoch))
+                fecha_formateada = fecha.strftime("%Y-%m-%d")
+            else:
+                fecha_formateada = "Nunca / No definido"
+        except ValueError:
+            fecha_formateada = "Desconocido"
+        
         usuarios_final[nombre]['politica'] = {
             'expire': registro.get('expire'),
-            'last_change': registro.get('last_change'),
+            'last_change': fecha_formateada,
             'max': registro.get('max'),
             'min': registro.get('min'),
             'warning': registro.get('warning')

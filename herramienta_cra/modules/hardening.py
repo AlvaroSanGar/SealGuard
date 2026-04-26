@@ -31,6 +31,10 @@ def auditar_suid_sgid(verbose):
         
         # Miramos los permisos otros [-1] y de grupo [-2]
         if permisos and len(permisos) >= 3 and (permisos[-1] in critical_per or permisos[-2] in critical_per) or vulnerable_dir:
+            
+            motivo = "Ubicación en directorio crítico" if vulnerable_dir else "Permisos excesivos (Otros/Grupo: "+str(permisos[-2:])+")"
+            proceso["motivo"] = motivo
+            
             resultados["peligrosos"].append(proceso)
             if verbose and vulnerable_dir:
                 print("     [X] Se ha detectado un proceso con el bit SUID/GUID activo en: "+str(proceso["path"]))
@@ -189,7 +193,8 @@ def auditar_ssh(verbose):
     resultados =  {
         "estado": "PELIGROSO",
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_ssh": [] 
     }
     
     # Cargamos los datos del .yaml
@@ -202,7 +207,6 @@ def auditar_ssh(verbose):
         ssh_usu = None
         
         
-        
     # Comprobamos si ssh está instalado, en caso de que no lo esté marcamos el servicio como seguro
     if not os.path.exists('/etc/ssh/sshd_config'):
         resultados["estado"] = "SEGURO"
@@ -210,8 +214,6 @@ def auditar_ssh(verbose):
         if verbose:
             print("     [i] "+str(resultados.get("detalles")))
         return resultados
-
-
 
     # Obtenemos el archivo ssh y lo leemos en busqueda de los parametros de config indicados en el .yaml
     contenido_ssh = {}
@@ -242,6 +244,7 @@ def auditar_ssh(verbose):
             if contenido_ssh[atributo].lower() == ssh_params[atributo].lower():
                 detalle = 'El parametro '+str(atributo)+' cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
                 resultados["detalles"].append(detalle)
+                resultados["tabla_ssh"].append({"param": atributo, "estado": "OK", "desc": detalle})
                 if verbose:
                     print("     [V] "+str(detalle))
             
@@ -249,6 +252,7 @@ def auditar_ssh(verbose):
             else:
                 alerta = 'El parametro '+str(atributo)+' no cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
                 resultados["alertas"].append(alerta)
+                resultados["tabla_ssh"].append({"param": atributo, "estado": "RIESGO", "desc": alerta})
                 if verbose:
                     print("     [X] "+str(alerta))
         
@@ -256,6 +260,7 @@ def auditar_ssh(verbose):
         else:
             alerta = 'El parametro '+str(atributo)+' no está configurado en el servicio ssh'
             resultados["alertas"].append(alerta)
+            resultados["tabla_ssh"].append({"param": atributo, "estado": "FALTA", "desc": alerta}) 
             if verbose:
                 print("     [!] "+str(alerta))
                 
@@ -264,17 +269,19 @@ def auditar_ssh(verbose):
     if contenido_ssh.get("Port", "22") == "22":
         alerta = 'El puerto en el que se está ejecutando SSH es por defecto (22), es vulnerable a ataques de bots automatizados'
         resultados["alertas"].append(alerta)
+        resultados["tabla_ssh"].append({"param": "Port", "estado": "RIESGO", "desc": alerta})
         if verbose:
             print("     [X] "+str(alerta))
         
     else: # En caso de que no se ejecute en el p22
         detalle = 'El servicio se está ejecutando en el puerto '+str(contenido_ssh.get("Port"))
         resultados["detalles"].append(detalle)
+        resultados["tabla_ssh"].append({"param": "Port", "estado": "OK", "desc": detalle})
         if verbose:
             print("     [V] "+str(detalle))
     
     
-    ##################### Comprobamos los usuarios
+    ##################### Comprobamos los usuarios #######################################################################
     if ssh_usu:
         usuarios_actuales_str = contenido_ssh.get("AllowUsers", "")
         lista_actuales = usuarios_actuales_str.split() # Lo convertimos en lista separando por espacios
@@ -286,11 +293,13 @@ def auditar_ssh(verbose):
         if not faltan and not sobran and usuarios_actuales_str:
             detalle = 'La directiva AllowUsers coincide exactamente con los usuarios permitidos en la política.'
             resultados["detalles"].append(detalle)
+            resultados["tabla_ssh"].append({"param": "AllowUsers", "estado": "OK", "desc": detalle}) # [NUEVO]
             if verbose:
                 print("     [V] " + str(detalle))
         else:
             alerta = 'La lista de usuarios permitidos (AllowUsers) no coincide. Esperado: ' + " ".join(ssh_usu) + ' | Actual: ' + usuarios_actuales_str
             resultados["alertas"].append(alerta)
+            resultados["tabla_ssh"].append({"param": "AllowUsers", "estado": "RIESGO", "desc": alerta}) # [NUEVO]
             if verbose:
                 print("     [X] " + str(alerta))
     
@@ -683,7 +692,8 @@ def auditar_certificados(verbose):
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_certificados": [] 
     }
     
     #Obtenemos la info  de settings.yaml 
@@ -715,11 +725,21 @@ def auditar_certificados(verbose):
         tipo = archivo.get("tipo")
         max_permisos_esp = archivo.get("max_permissions")
         dueno_esp = archivo.get("owner")
+        
+        info_cert = {
+            "ruta": ruta,
+            "tipo": tipo.upper(),
+            "estado_color": "OK",
+            "problemas": []
+        }
 
         # Comprobamos si el archivo existe realmente
         if not os.path.exists(ruta):
             alerta = "No se encuentra el hash: "+str(ruta)
             resultados["alertas"].append(alerta)
+            info_cert["problemas"].append("Archivo no encontrado en el sistema")
+            info_cert["estado_color"] = "NO ENCONTRADO"
+            resultados["tabla_certificados"].append(info_cert)
             if verbose:
                 print("     [!] "+str(alerta))
             continue
@@ -733,6 +753,8 @@ def auditar_certificados(verbose):
             if dueno_actu != dueno_esp:
                 alerta = "El archivo "+str(ruta)+" no tiene el dueño esperado. Actual: "+str(dueno_actu)+" | Esperado: "+str(dueno_esp)
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Dueño incorrecto (Actual: "+str(dueno_actu)+")")
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
                     print("     [X] "+str(alerta))
         except KeyError:
@@ -749,6 +771,8 @@ def auditar_certificados(verbose):
         if (perm_actual & ~perm_max) != 0: 
             alerta = "El archivo "+str(ruta)+" tiene permisos excesivos. Actual: "+str(oct(perm_actual))+" | Máximo permitido: 0o"+str(max_permisos_esp)
             resultados["alertas"].append(alerta)
+            info_cert["problemas"].append("Permisos excesivos ("+str(oct(perm_actual))+")")
+            info_cert["estado_color"] = "PELIGROSO"
             if verbose:
                 print("     [X] "+str(alerta))
         else:
@@ -759,12 +783,13 @@ def auditar_certificados(verbose):
 
         # Si el archivo es una clave privada, pasamos al siguiente 
         if tipo == "privado":
+            resultados["tabla_certificados"].append(info_cert)
             continue
 
 
         #################### Evaluamos el contenido criptográfico (solo públicos) ########################
         query = "SELECT not_valid_after, signing_algorithm, issuer, subject FROM certificates WHERE path = '"+str(ruta)+"';"
-        res_osquery = ejecutar_consulta(query) # Asegúrate de que usas tu función de DB correspondiente
+        res_osquery = ejecutar_consulta(query) 
 
         if res_osquery:
             datos = res_osquery[0]
@@ -779,6 +804,8 @@ def auditar_certificados(verbose):
                 if dias_restantes < 0:
                     alerta = "El certificado "+str(ruta)+" ha caducado hace "+str(abs(dias_restantes))+" días"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Caducado hace "+str(abs(dias_restantes))+" días")
+                    info_cert["estado_color"] = "PELIGROSO"
                     if verbose:
                         print("     [X] "+str(alerta))
                         
@@ -786,6 +813,8 @@ def auditar_certificados(verbose):
                 elif dias_restantes <= dias_aviso:
                     alerta = "El certificado "+str(ruta)+" caduca pronto (en "+str(dias_restantes)+" días)"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Caduca en "+str(dias_restantes)+" días")
+                    if info_cert["estado_color"] != "PELIGROSO": info_cert["estado_color"] = "ADVERTENCIA"
                     if verbose:
                         print("     [!] "+str(alerta))
                         
@@ -804,6 +833,8 @@ def auditar_certificados(verbose):
             if algo_actual not in algoritmos_permitidos:
                 alerta = "El certificado "+str(ruta)+" usa un algoritmo no permitido: "+str(algo_actual)
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Algoritmo débil: "+str(algo_actual))
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
                     print("     [X] "+str(alerta))
             else:
@@ -817,6 +848,8 @@ def auditar_certificados(verbose):
             if datos.get("issuer") == datos.get("subject"):
                 alerta = "El certificado "+str(ruta)+" está AUTOFIRMADO (Peligro en producción)"
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Certificado Autofirmado")
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
                     print("     [!] "+str(alerta))
 
@@ -833,6 +866,8 @@ def auditar_certificados(verbose):
                     if tamano < min_rsa:
                         alerta = "El certificado "+str(ruta)+" tiene una clave insuficiente: "+str(tamano)+" bits (Min: "+str(min_rsa)+")"
                         resultados["alertas"].append(alerta)
+                        info_cert["problemas"].append("Clave RSA muy corta ("+str(tamano)+" bits)")
+                        info_cert["estado_color"] = "PELIGROSO"
                         if verbose:
                             print("     [X] "+str(alerta))
                     else:
@@ -845,6 +880,8 @@ def auditar_certificados(verbose):
                 if "TLS Web Server Authentication" not in salida_ssl:
                     alerta = "El certificado "+str(ruta)+" no tiene el permiso 'Server Authentication'"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Falta permiso EKU 'Server Authentication'")
+                    info_cert["estado_color"] = "PELIGROSO"
                     if verbose:
                         print("     [X] "+str(alerta))
                 else:
@@ -855,6 +892,7 @@ def auditar_certificados(verbose):
         except Exception:
             pass
 
+        resultados["tabla_certificados"].append(info_cert)
 
     #################### Catalogamos el resultado final ############################################
     if len(resultados["alertas"]) == 0:

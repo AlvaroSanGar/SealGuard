@@ -4,6 +4,8 @@ from config.settings import config
 
 
 
+
+
 ###########################################################################################################################
 def auditar_backups(verbose):
     print("[+] Auditando políticas de copias de seguridad")
@@ -11,7 +13,9 @@ def auditar_backups(verbose):
         "backups_activos": False,
         "mecanismos_encontrados": [],
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_backups": [], 
+        "huerfanos": []
     }
     #Sacamos los datos del .yaml
     try:
@@ -38,6 +42,15 @@ def auditar_backups(verbose):
             detalle = "Se ha detectado una tarea programada de backup en "+str(ruta_cron)+": "+str(comando[:50])
             resultados["detalles"].append(detalle)
             resultados["mecanismos_encontrados"].append(str("cron: "+ruta_cron))
+            
+            resultados["tabla_backups"].append({
+                "nombre": comando[:40] + "...", 
+                "tipo": "Cron", 
+                "estado": "ACTIVO", 
+                "estado_color": "OK",
+                "ruta": ruta_cron
+            })
+            
             if verbose:
                 print("     [i] "+str(detalle))
     else:
@@ -71,11 +84,21 @@ def auditar_backups(verbose):
                     detalle = 'Se ha detectado la unidad de backup activa: '+str(nombre_uni)+' | '+str(descrip_uni)
                     resultados["detalles"].append(detalle)
                     resultados["mecanismos_encontrados"].append(nombre_uni.removesuffix('.timer'))
+                    
+                    resultados["tabla_backups"].append({
+                        "nombre": nombre_uni, "tipo": "Systemd Timer", "estado": estado_uni.upper(), "estado_color": "OK", "ruta": descrip_uni
+                    })
+                    
                     if verbose: print("     [V] "+str(detalle))
                 
                 else:
                     alerta = 'Se ha detectado la unidad de backup en estado '+str(estado_uni)+': '+str(nombre_uni)+' | '+str(descrip_uni)
                     resultados["alertas"].append(alerta)
+                    
+                    resultados["tabla_backups"].append({
+                        "nombre": nombre_uni, "tipo": "Systemd Timer", "estado": estado_uni.upper(), "estado_color": "RIESGO", "ruta": descrip_uni
+                    })
+                    
                     if verbose: print("     [i] "+str(alerta))
                 
             elif nombre_uni.endswith('.service'):
@@ -86,6 +109,9 @@ def auditar_backups(verbose):
                 elif not nombre_uni.removesuffix('.service') in resultados["mecanismos_encontrados"]:
                     alerta = 'Se ha detectado la unidad '+str(nombre_uni)+' la cual no tiene ningún timer asociado'
                     resultados["alertas"].append(str(alerta))
+                    
+                    resultados["huerfanos"].append(nombre_uni)
+                    
                     if verbose: print("     [!] "+str(alerta))
                     
     # evaluamos el resultado
@@ -93,6 +119,8 @@ def auditar_backups(verbose):
         resultados["backups_activos"] = True
     
     return resultados
+
+
 
 
 
@@ -117,10 +145,10 @@ def auditar_protecciones_dos(verbose):
         "tcp_max_syn_backlog": False,
         "icmp_echo_ignore_broadcasts": False,
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_dos": [] 
     }
     
-    # Cargamos la lista de nomres en una consulta a OSquery
     nombres = [
         "net.ipv4.tcp_syncookies", 
         "net.ipv4.conf.all.rp_filter", 
@@ -131,86 +159,91 @@ def auditar_protecciones_dos(verbose):
     query = str('SELECT name, current_value FROM system_controls WHERE name IN ("'+nombres_sql+'");')
     res = ejecutar_consulta(query)
     
-    # Guardamos los resultados en un diccionario 
-    valores = {}
+    # [CORRECCIÓN] Inicializamos por defecto en 0. Si OSquery falla o no los lista, asumimos que son vulnerables.
+    valores = {
+        "net.ipv4.tcp_syncookies": "0",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.tcp_max_syn_backlog": "0",
+        "net.ipv4.icmp_echo_ignore_broadcasts": "0"
+    }
+    
     if res:
         for item in res:
-            # Si no obtenemos ningún valor ponemos 0 ya que en todos los casos es el equivalente a que esté desactivado
             valores[item["name"]] = str(item.get("current_value", "0"))
             
     
     ############### tcp_syncookies ##################################################################################################
-    if "net.ipv4.tcp_syncookies" in valores:
-        val_syncookies = valores["net.ipv4.tcp_syncookies"]
-        if val_syncookies == "1":
-            resultados["tcp_syncookies"] = True
-            detalle = "SYN Cookies está activado con normalidad. El kernel enviará cookies solo cuando la cola esté llena"
-            resultados["detalles"].append(detalle)
-            if verbose: print("     [V] " + detalle)
-        elif val_syncookies == "2":
-            resultados["tcp_syncookies"] = True 
-            alerta = "SYN Cookies está activado en modo forzado. Aunque da protección, no se recomienda ya que aumenta la carga de CPU"
-            resultados["alertas"].append(alerta)
-            if verbose: print("     [!] " + alerta)
-        else: 
-            alerta = "SYN Cookies está desactivado. El servidor dejará de aceptar conexiones si la cola se llena"
-            resultados["alertas"].append(alerta)
-            if verbose: print("     [X] " + alerta)
-    else:
-        resultados["alertas"].append("No se ha podido comprobar net.ipv4.tcp_syncookies")
+    val_syncookies = valores["net.ipv4.tcp_syncookies"]
+    if val_syncookies == "1":
+        resultados["tcp_syncookies"] = True
+        detalle = "SYN Cookies está activado con normalidad. El kernel enviará cookies solo cuando la cola esté llena"
+        resultados["detalles"].append(detalle)
+        resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "OK", "desc": detalle}) 
+        if verbose: print("     [V] " + detalle)
+    elif val_syncookies == "2":
+        resultados["tcp_syncookies"] = True 
+        alerta = "SYN Cookies está activado en modo forzado. Aunque da protección, no se recomienda ya que aumenta la carga de CPU"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "ADVERTENCIA", "desc": alerta}) 
+        if verbose: print("     [!] " + alerta)
+    else: 
+        alerta = "SYN Cookies está desactivado. El servidor dejará de aceptar conexiones si la cola se llena"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "PELIGRO", "desc": alerta}) 
+        if verbose: print("     [X] " + alerta)
 
     ########## rp_filter ################################################################################################################
-    if "net.ipv4.conf.all.rp_filter" in valores:
-        val_rpfilter = valores["net.ipv4.conf.all.rp_filter"]
-        if val_rpfilter == "1":
-            resultados["rp_filter"] = True
-            detalle = "Reverse Path Filter está en activado en modo estricto"
-            resultados["detalles"].append(detalle)
-            if verbose: print("     [V] " + detalle)
-        elif val_rpfilter == "2":
-            resultados["rp_filter"] = True
-            alerta = "Reverse Path Filter está activado en modo perdida. Solo verifica si la IP es alcanzable"
-            resultados["alertas"].append(alerta)
-            if verbose: print("     [!] " + alerta)
-        else: 
-            alerta = "Reverse Path Filter  está desactivado. El sistema no valida la ruta de origen"
-            resultados["alertas"].append(alerta)
-            if verbose: print("     [X] " + alerta)
-    else:
-        resultados["alertas"].append("No se ha podido comprobar net.ipv4.conf.all.rp_filter")
+    val_rpfilter = valores["net.ipv4.conf.all.rp_filter"]
+    if val_rpfilter == "1":
+        resultados["rp_filter"] = True
+        detalle = "Reverse Path Filter está activado en modo estricto"
+        resultados["detalles"].append(detalle)
+        resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "OK", "desc": detalle}) 
+        if verbose: print("     [V] " + detalle)
+    elif val_rpfilter == "2":
+        resultados["rp_filter"] = True
+        alerta = "Reverse Path Filter está activado en modo perdida. Solo verifica si la IP es alcanzable"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "ADVERTENCIA", "desc": alerta}) 
+        if verbose: print("     [!] " + alerta)
+    else: 
+        alerta = "Reverse Path Filter está desactivado. El sistema no valida la ruta de origen"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "PELIGRO", "desc": alerta}) 
+        if verbose: print("     [X] " + alerta)
 
     ########## tcp_max_syn_backlog ########################################################################################################
-    if "net.ipv4.tcp_max_syn_backlog" in valores:
-        try:
-            val_backlog = int(valores["net.ipv4.tcp_max_syn_backlog"])
-            if val_backlog >= 2048:
-                resultados["tcp_max_syn_backlog"] = True
-                detalle = "El tamaño de la cola SYN es seguro ("+str(val_backlog)+" bytes)"
-                resultados["detalles"].append(detalle)
-                if verbose: print("     [V] " + detalle)
-            else:
-                alerta = "El tamaño de la cola SYN es insuficiente ("+str(val_backlog)+" bytes)"
-                resultados["alertas"].append(alerta)
-                if verbose: print("     [X] " + alerta)
-        except ValueError:
-            resultados["alertas"].append("El valor de tcp_max_syn_backlog no es numérico")
-    else:
-        resultados["alertas"].append("No se ha podido comprobar net.ipv4.tcp_max_syn_backlog")
-
-    ########## icmp_echo_ignore_broadcasts ################################################################################################
-    if "net.ipv4.icmp_echo_ignore_broadcasts" in valores:
-        val_icmp = valores["net.ipv4.icmp_echo_ignore_broadcasts"]
-        if val_icmp == "1":
-            resultados["icmp_echo_ignore_broadcasts"] = True
-            detalle = "Ignorar ICMP Broadcast está activado"
+    try:
+        val_backlog = int(valores["net.ipv4.tcp_max_syn_backlog"])
+        if val_backlog >= 2048:
+            resultados["tcp_max_syn_backlog"] = True
+            detalle = "El tamaño de la cola SYN es seguro ("+str(val_backlog)+" bytes)"
             resultados["detalles"].append(detalle)
+            resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "OK", "desc": detalle}) 
             if verbose: print("     [V] " + detalle)
         else:
-            alerta = "Ignorar ICMP Broadcast está desactivado. El sistema responderá a pings broadcast y podría usarse para amplificar ataques DDoS"
+            alerta = "El tamaño de la cola SYN es insuficiente ("+str(val_backlog)+" bytes)"
             resultados["alertas"].append(alerta)
+            resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "PELIGRO", "desc": alerta}) 
             if verbose: print("     [X] " + alerta)
+    except ValueError:
+        alerta = "El valor de tcp_max_syn_backlog no es numérico"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "PELIGRO", "desc": alerta})
+
+    ########## icmp_echo_ignore_broadcasts ################################################################################################
+    val_icmp = valores["net.ipv4.icmp_echo_ignore_broadcasts"]
+    if val_icmp == "1":
+        resultados["icmp_echo_ignore_broadcasts"] = True
+        detalle = "Ignorar ICMP Broadcast está activado"
+        resultados["detalles"].append(detalle)
+        resultados["tabla_dos"].append({"param": "icmp_echo_ignore_broadcasts", "estado_color": "OK", "desc": detalle}) 
+        if verbose: print("     [V] " + detalle)
     else:
-        resultados["alertas"].append("No se ha podido comprobar net.ipv4.icmp_echo_ignore_broadcasts")
+        alerta = "Ignorar ICMP Broadcast está desactivado. El sistema responderá a pings broadcast y podría usarse para amplificar ataques DDoS"
+        resultados["alertas"].append(alerta)
+        resultados["tabla_dos"].append({"param": "icmp_echo_ignore_broadcasts", "estado_color": "PELIGRO", "desc": alerta}) 
+        if verbose: print("     [X] " + alerta)
 
 
     ########## Evaluamos el estado global del módulo #####################################################################################
@@ -242,24 +275,15 @@ def auditar_protecciones_dos(verbose):
         
     return resultados
 
-
-
-
-
-
-
-
-
-
-
-
 ###########################################################################################################################
 def auditar_limites_recursos(verbose):
     print("[+] Auditando límites de recursos de usuario")
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_limites": [],
+        "ningun_limite": False
     }
     
     # Vamos a comprobar los archivos de configuración en los que se definen los límites de los recursos de cada usuario
@@ -271,9 +295,10 @@ def auditar_limites_recursos(verbose):
             if archivo.endswith('.conf'):
                 archivos_limits.append(str('/etc/security/limits.d/'+str(archivo)))
                 
-    limites_encontrados = {
-        "nproc": False,
-        "core": False
+    estado_limites = {
+        "nproc": {"encontrado": False, "valor": "-", "archivo": "-", "desc_riesgo": "Agotamiento de tabla de procesos (Fork Bomb)"},
+        "core": {"encontrado": False, "valor": "-", "archivo": "-", "desc_riesgo": "Llenado de disco por volcados de memoria masivos"},
+        "nofile": {"encontrado": False, "valor": "-", "archivo": "-", "desc_riesgo": "Agotamiento de descriptores (Too many open files)"}
     }
 
     # Leemos los archivos buscando los límites "hard" o "-" (hard y soft)
@@ -296,16 +321,12 @@ def auditar_limites_recursos(verbose):
                         
                         # Buscamos un dominio global (*) o general para proteger el sistema
                         if dominio == '*' and tipo in ['hard', '-']:
-                            if item == 'nproc':
-                                limites_encontrados["nproc"] = True
-                                detalle = "Límite global de procesos (nproc) detectado en "+str(ruta)+": "+str(valor)
+                            if item in estado_limites:
+                                estado_limites[item]["encontrado"] = True
+                                estado_limites[item]["valor"] = valor
+                                estado_limites[item]["archivo"] = ruta
+                                detalle = "Límite global ("+str(item)+") detectado en "+str(ruta)+": "+str(valor)
                                 resultados["detalles"].append(str(detalle))
-                                if verbose: print("     [V] "+str(detalle))
-                                
-                            elif item == 'core':
-                                limites_encontrados["core"] = True
-                                detalle = "Límite global de volcados de memoria (core) detectado en "+str(ruta)+": "+str(valor)
-                                resultados["detalles"].append(detalle)
                                 if verbose: print("     [V] "+str(detalle))
                                 
         except Exception as e:
@@ -313,28 +334,48 @@ def auditar_limites_recursos(verbose):
             resultados["alertas"].append(str(alerta))
             if verbose: print("     [ERROR] "+str(alerta))
 
+    limites_faltantes = []
+    limites_encontrados_contador = 0
+    for param, info in estado_limites.items():
+        resultados["tabla_limites"].append({
+            "param": param,
+            "encontrado": info["encontrado"],
+            "valor": info["valor"],
+            "archivo": info["archivo"],
+            "riesgo": info["desc_riesgo"]
+        })
+        if not info["encontrado"]:
+            limites_faltantes.append(param)
+        else:
+            limites_encontrados_contador += 1
+
+    # Lógica de si no hay ninguno
+    if limites_encontrados_contador == 0:
+        resultados["ningun_limite"] = True
 
     ##### Evaluamos los resultados
-    if limites_encontrados["nproc"] and limites_encontrados["core"]:
+    if not limites_faltantes:
         resultados["estado"] = "SEGURO"
         if verbose: 
-            print("     [V] El sistema se encuentra protegido frente a Fork Bombs y volcados masivos")
+            print("     [V] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
             
-    elif limites_encontrados["nproc"]:
+    elif limites_encontrados_contador > 0:
         resultados["estado"] = "ADVERTENCIA"
-        alerta = "Protección contra Fork Bombs activa, pero falta limitar los volcados de memoria"
+        alerta = "Protección parcial. Faltan límites para: " + ", ".join(limites_faltantes)
         resultados["alertas"].append(alerta)
         if verbose: 
             print("     [!] "+str(alerta))
             
     else:
         resultados["estado"] = "PELIGROSO"
-        alerta = "Riesgo crítico de denegación de servicio por agotamiento de tabla de procesos"
+        alerta = "Riesgo crítico de denegación de servicio. No se detectó ningún límite."
         resultados["alertas"].append(alerta)
         if verbose: 
             print("     [X] "+str(alerta))
             
     return resultados
+
+
 
 
 

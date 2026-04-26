@@ -136,7 +136,7 @@ def verificar_integridad(verbose):
         
         else:
             estado = "MODIFICADO"
-            # Conseguimos el parametro/os que ha cambiodo
+            # Conseguimos el parametro/os que ha cambiado
             if resul.get("hash") != comp[archi].get("hash"):
                 detalles_cambio.append("hash")
             
