@@ -328,13 +328,19 @@ def auditar_firewall(verbose):
     
     resultado = {
         "estado": "PELIGROSO",
-        "firewall_activo": "Ninguno",
-        "detalles": [],
+        "servicios": [], 
+        "kernel": {
+            "reglas_bloqueo": 0,
+            "politica_accept": False,
+            "bloqueo_output": False,
+            "bloqueo_forward": False,
+            "tipo_filtro": "Desconocido"
+        },
         "alertas": []
     }
+    
     try:
         lista_firewalls = config["hardening"]["firewall_services"]
-    
     except KeyError:
         print("     [ERROR] No se han podido cargar los firewalls de la config.yaml")
         lista_firewalls = []
@@ -351,12 +357,15 @@ def auditar_firewall(verbose):
         # Comprobamos si exsten los firewalls en el sistema e iteramos sobre la respuesta
         if resultado_consulta:
             for servicio in resultado_consulta:
-                nombre = servicio.get("id").replace(".service", "") # Limpiamos el nombre por comodidad ya que todos terminan en .service
+                # Limpiamos el nombre por comodidad ya que todos terminan en .service
+                nombre = servicio.get("id").replace(".service", "") 
                 estado_actu = servicio.get("active_state")
                 estado_arranque = servicio.get("unit_file_state")
                 
+                esta_activo = (estado_actu == 'active') # Equivalente a un if, si se cumple la condición esta_activo será true, por el contrario false
+                
                 # Comprobamos si está activo y si por defecto se inicia al arrancar el sistema 
-                if estado_actu == 'active':
+                if esta_activo:
                     servicios_activos.append(nombre)
                     
                     # Comprobamos si no está configurado para arrancar al iniciar el sistema
@@ -365,6 +374,9 @@ def auditar_firewall(verbose):
                         resultado["alertas"].append(alerta)
                         if verbose:
                             print("     [!] " + alerta)
+                    else:
+                        if verbose:
+                            print("     [V] El gestor '" + nombre + "' está ACTIVO y habilitado de forma persistente (enabled)")
                             
                 # Caso de que esté configurado para arrancar siempre, pero actualmente está apagado o caído
                 elif estado_arranque == 'enabled' and estado_actu != 'active':
@@ -373,32 +385,44 @@ def auditar_firewall(verbose):
                     if verbose:
                         print("     [!] " + alerta)
 
+                resultado["servicios"].append({
+                    "nombre": nombre,
+                    "activo": esta_activo,
+                    "arranque": estado_arranque
+                })
+
     ############## Comprobación de si ay normas activas (de bloquear y descartar) ########################################
     reglas_bloqueo = 0
     politica_accept = False
     bloqueo_output = False
     bloqueo_forward = False
+    tipo_encontrado = "Desconocido" 
+    
+    iptables_funciona = False 
+    nftables_funciona = False 
     
     # Tratamos de obtener las normas actuales del sistema con iptables -S (similar a las interfaces de networking)
     # de esta forma buscamos las políticas que hemos obtenido y rechazan o bloquean peticiones (si no hay ninguna de este
     # timpo, el firewall no estará filtrando nada, por lo que en la práctica sería como si no estuviese activo)
     try:
         # Leemos todas las posibles cadenas (OUTPUT, FORWARD, etc.)
-        res_iptables = subprocess.run(["iptables", "-S"], capture_output=True, text=True)
+        res_iptables = subprocess.run(["iptables", "-S"], capture_output=True, text=True, timeout=2)
         if res_iptables.returncode == 0:
+            tipo_encontrado = "IPtables"
+            iptables_funciona = True 
             for linea in res_iptables.stdout.splitlines():
                 # Buscamos políticas por defecto permisivas
-                if "-P INPUT ACCEPT" in linea:
+                if "-P INPUT ACCEPT" in linea: 
                     politica_accept = True
                     
                 # Buscamos reglas generales de bloqueo
-                if "-P INPUT DROP" in linea or "-j DROP" in linea or "-j REJECT" in linea:
+                if "-P INPUT DROP" in linea or "-j DROP" in linea or "-j REJECT" in linea: 
                     reglas_bloqueo += 1
                     
                 # Buscamos reglas de OUTPUT y FORWARD
-                if "OUTPUT" in linea and ("DROP" in linea or "REJECT" in linea):
+                if "OUTPUT" in linea and ("DROP" in linea or "REJECT" in linea): 
                     bloqueo_output = True
-                if "FORWARD" in linea and ("DROP" in linea or "REJECT" in linea):
+                if "FORWARD" in linea and ("DROP" in linea or "REJECT" in linea): 
                     bloqueo_forward = True
         elif verbose:
             print("     [DEBUG] iptables devolvió error: " + res_iptables.stderr.strip().replace('\n', ' '))
@@ -411,21 +435,20 @@ def auditar_firewall(verbose):
             
     # En algunos sistemas podemos no tener la opción anterior, por lo que lo volvemos a intentar esta vez
     # con Nftables (versión más moderna)
-    if reglas_bloqueo == 0:
+    if not iptables_funciona:
         try:
-            res_nft = subprocess.run(["nft", "list", "ruleset"], capture_output=True, text=True)
+            res_nft = subprocess.run(["nft", "list", "ruleset"], capture_output=True, text=True, timeout=2)
             if res_nft.returncode == 0:
+                tipo_encontrado = "Nftables"
+                nftables_funciona = True
+                
                 # Convertimos toda la salida a minúsculas para buscar fácilmente
                 salida_nft = res_nft.stdout.lower()
                 
-                if "policy accept" in salida_nft:
-                    politica_accept = True
-                if "drop" in salida_nft or "reject" in salida_nft:
-                    reglas_bloqueo += 1
-                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
-                    bloqueo_output = True
-                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
-                    bloqueo_forward = True
+                if "policy accept" in salida_nft: politica_accept = True
+                if "drop" in salida_nft or "reject" in salida_nft: reglas_bloqueo += 1
+                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): bloqueo_output = True
+                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): bloqueo_forward = True
             elif verbose:
                 print("     [DEBUG] nft devolvió error: " + res_nft.stderr.strip().replace('\n', ' '))
         except FileNotFoundError:
@@ -434,36 +457,46 @@ def auditar_firewall(verbose):
         except Exception as e:
             if verbose:
                 print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+
+    if not iptables_funciona and not nftables_funciona:
+        alerta_desc = "No se ha detectado IPtables ni Nftables instalados en el sistema (Estado de red desconocido)"
+        resultado["alertas"].append(alerta_desc)
+        if verbose:
+            print("     [?] " + alerta_desc)
+
+    resultado["kernel"]["tipo_filtro"] = tipo_encontrado
+    resultado["kernel"]["reglas_bloqueo"] = reglas_bloqueo
+    resultado["kernel"]["politica_accept"] = politica_accept
+    resultado["kernel"]["bloqueo_output"] = bloqueo_output
+    resultado["kernel"]["bloqueo_forward"] = bloqueo_forward
     
     ########### Clasificamos los resultados obtenidos ################################################################
     if reglas_bloqueo > 0:
         resultado["estado"] = "SEGURO"
         # Caso de que el firewall está en systemd y tiene reglas de bloqueo en el kernel
         if len(servicios_activos) > 0:
-            resultado["firewall_activo"] = " / ".join(servicios_activos)
-            resultado["detalles"].append('El sistema está protegido por '+resultado["firewall_activo"]+' y por '+str(reglas_bloqueo)+' reglas de bloqueo')
+            fw_activo = " / ".join(servicios_activos)
             if verbose:
-                print("     [V] "+resultado["detalles"][-1])
-        
+                print("     [V] El sistema está protegido por " + fw_activo + " y por " + str(reglas_bloqueo) + " reglas de bloqueo")
         # Caso de que el firewall no se está ejecutando pero hay reglas en el kernel
         else:
-            resultado["firewall_activo"] = "Reglas de bloqueo manuales"
-            resultado["detalles"].append('No se ha detectado ningún servicio de getión activo, pero el sistema está protegido por '+str(reglas_bloqueo)+' reglas de bloqueo')
             if verbose:
-                print("     [V] "+resultado["detalles"][-1])
+                print("     [V] No se ha detectado ningún servicio de gestión activo, pero el sistema está protegido por " + str(reglas_bloqueo) + " reglas de bloqueo")
     
     # Caso de que aunque está activo un firewall no hay reglas de bloqueo en el kernel, por lo que no se filtra
     elif len(servicios_activos) > 0:
-        resultado["firewall_activo"] = " / ".join(servicios_activos)
-        resultado["alertas"].append('Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
+        alerta = 'Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real'
+        resultado["alertas"].append(alerta)
         if verbose:
-            print('     [!] Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
-    
+            print("     [!] " + alerta)
+            
     # No hay ni firewall ni reglas
     else:
-        resultado["alertas"].append('No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
-        if verbose:
-            print('     [X] No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
+        if iptables_funciona or nftables_funciona:
+            alerta = 'No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red'
+            resultado["alertas"].append(alerta)
+            if verbose:
+                print("     [X] " + alerta)
             
     ############## Alertas extra ####################################################################################
     # Solo alertamos si el firewall está activo o hay reglas, porque si está apagado ya lo hemos dicho arriba.
@@ -549,11 +582,12 @@ def auditar_aslr(verbose):
 #################################################################################################################################
 def auditar_mac(verbose):
     print("[+] Comprobando Control de Acceso Obligatorio (AppArmor/SELinux)...")
+    
+    # Nuevo esquema de datos: Estructurado y limpio para tabular
     resultado = {
         "estado": "PELIGROSO",
-        "mac_activo": None,
-        "detalles": [],
-        "alertas": []
+        "apparmor": {"activo": False, "enforce": 0, "complain": 0},
+        "selinux": {"activo": False, "modo": "Deshabilitado"}
     }
     
     seguro = False
@@ -574,62 +608,61 @@ def auditar_mac(verbose):
             
             if verbose:
                 print("     [i] Se ha detectado AppArmor como sistema de Control de Acceso Obligatorio")
+            
             for linea in res_AppArmor:
                 modo = linea.get("mode")
-                tot = linea.get("total",0)
+                tot = linea.get("total", 0)
                 
                 # Clasificamos los procesos
-                if modo == 'enforce':
+                if modo == 'enforce': 
                     enforce = int(tot)
-                if modo == 'complain':
+                if modo == 'complain': 
                     complain = int(tot)
-        
+            
+            # Guardamos 
+            resultado["apparmor"]["activo"] = True
+            resultado["apparmor"]["enforce"] = enforce
+            resultado["apparmor"]["complain"] = complain
+            
             if enforce > 0:
                 resultado["estado"] = "SEGURO"
-                resultado["mac_activo"] = "AppArmor"
-                resultado["detalles"].append(str(enforce) + " perfiles de AppArmor en modo 'enforce' (Activos)")
-                seguro = True
+                seguro = True # Ponemos seguro a True para que no salte el print final de error
                 if verbose:
-                    print("         - Se han detectado "+str(enforce)+" procesos marcados en modo 'enforce'")
+                    print("         - Se han detectado " + str(enforce) + " procesos marcados en modo 'enforce'")
                     
-            if complain > 0:
-                resultado["mac_activo"] = "AppArmor"
-                alerta = "Se han detectado "+str(complain)+" procesos marcados en modo 'complain'"
-                resultado["alertas"].append(alerta)
-                if verbose:
-                    print("         - "+alerta)
-            
+            if complain > 0 and verbose:
+                print("         - Se han detectado " + str(complain) + " procesos marcados en modo 'complain'")
+                
     # Ahora lo comprobamos con SELinux (Redhat)
     # Pre-check: Miramos si existe el archivo de SELinux para no lanzar la consulta si no lo tenemos instalado
     query_precheck = "SELECT path FROM file WHERE path = '/etc/selinux/config';"
     res_precheck = ejecutar_consulta(query_precheck)
     
-    # Solo entramos a consultar SELinux si el pre-check encontró el archivo
     if res_precheck and len(res_precheck) > 0:
         query_selinux = "SELECT value FROM selinux_settings WHERE name = 'enforce';"
         res_selinux = ejecutar_consulta(query_selinux)
         
+        # Solo entramos a consultar SELinux si el pre-check encontró el archivo
         if res_selinux and len(res_selinux) > 0:
             valor_selinux = str(res_selinux[0].get("value", ""))
+            resultado["selinux"]["activo"] = True
             
             if valor_selinux == "1":
                 resultado["estado"] = "SEGURO"
-                if seguro:
-                    resultado["mac_activo"] += " y SELinux"
-                else:
-                    resultado["mac_activo"] = "SELinux"
-                resultado["detalles"].append("SELinux activo en modo 'enforcing' (Bloqueando amenazas)")
+                resultado["selinux"]["modo"] = "Enforcing"
                 seguro = True # Ponemos seguro a True para que no salte el print final de error
                 
-            elif valor_selinux == "0":
-                alerta = "SELinux está en modo 'permissive' (Solo avisa, no bloquea)"
-                resultado["alertas"].append(alerta)
                 if verbose:
-                    print("     [!] " + alerta)
-                
-    
+                    print("         - SELinux activo en modo 'enforcing' (Bloqueando amenazas)")
+                    
+            elif valor_selinux == "0":
+                resultado["selinux"]["modo"] = "Permissive"
+                if verbose:
+                    print("     [!] SELinux está en modo 'permissive' (Solo avisa, no bloquea)")
+                    
     if not seguro:
-        print("     [X] No se ha encontrado ningún servicio de Control de Acceso Obligatorio activo (AppArmor o SELinux)")
+        print("     [X] No se ha encontrado ningún servicio MAC activo (AppArmor o SELinux)")
+        
     return resultado
 
 

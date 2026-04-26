@@ -348,51 +348,255 @@
         </tbody>
     </table>
 
-
-    <h2 class="subsection-title">4. Autenticación Multifactor (2FA)</h2>
+<h2 class="subsection-title">4.2. Autenticación Multifactor (MFA/2FA)</h2>
+    
     {% if datos['2FA'].mfa_global %}
-        <div class="success-box"><strong>MFA Global:</strong> Se han detectado módulos PAM de doble factor en la configuración base (common-auth).</div>
+        <div class="success-box"><strong>MFA Global (PAM):</strong> Se han detectado módulos de doble factor en la configuración base del sistema (common-auth).</div>
     {% else %}
-        <div class="alert-box"><strong>MFA Global:</strong> No hay configuración 2FA activa a nivel de sistema.</div>
+        <div class="alert-box"><strong>MFA Global (PAM):</strong> No se ha detectado una configuración de segundo factor activa a nivel de sistema.</div>
     {% endif %}
 
-    <h2 class="subsection-title">5. Auditoría de Usuarios Relevantes</h2>
-    <table class="data-table">
-        <tr><th>Usuario (UID)</th><th>Shell</th><th>Grupos Críticos</th><th>Expiración Pass</th></tr>
-        {% for usu in datos.usuarios %}
-        <tr>
-            <td><strong>{{ usu.username }}</strong> ({{ usu.uid }})</td>
-            <td>{{ usu.shell }}</td>
-            <td>{% if usu.grupos_criticos %}<span class="badge bg-danger">{{ usu.grupos_criticos | join(', ') }}</span>{% else %}-{% endif %}</td>
-            <td>{{ usu.politica.max | default('No def') }} días</td>
-        </tr>
-        {% endfor %}
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Análisis de Servicios Protegidos</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Servicio / Aplicación</th>
+                <th class="col-mfa-status">Estado MFA</th>
+                <th class="col-mfa-details">Detalles de Configuración</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for servicio, info in datos['2FA'].servicios.items() %}
+            <tr>
+                <td><strong>{{ servicio }}</strong></td>
+                <td class="text-center">
+                    <span class="badge {% if info.protegido %}bg-safe{% else %}bg-danger{% endif %}">
+                        {% if info.protegido %}PROTEGIDO{% else %}VULNERABLE{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <ul class="table-details-list">
+                        {% for detalle in info.detalles %}
+                            <li>{{ detalle }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Requisitos de Infraestructura SSH</h3>
+    {% if datos['2FA'].ssh_config_valido %}
+        <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
+    {% else %}
+        <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
+    {% endif %}
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Auditoría de Tokens de Usuario</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Token Detectado</th>
+                <th class="col-token-status">Estado Efectivo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ut in datos['2FA'].usuarios_token %}
+            <tr>
+                <td><strong>{{ ut.usuario }}</strong></td>
+                <td><code class="font-mono">{{ ut.token }}</code></td>
+                <td class="text-center">
+                    <span class="badge {% if ut.efectivo %}bg-safe{% else %}bg-warning{% endif %}">
+                        {% if ut.efectivo %}ACTIVO{% else %}INCOMPLETO{% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" class="text-center">No se han encontrado tokens 2FA en los directorios personales.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
 
 
     <h1 id="anexo-3" class="section-title">Anexo III: Hardening del Sistema</h1>
 
-    <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
-    <ul>
-        <li><strong>MAC (AppArmor/SELinux):</strong> 
-            {% if datos.hardening.mac.estado == 'SEGURO' %}
-                <span class="badge bg-safe">{{ datos.hardening.mac.mac_activo }} ACTIVO</span>
-            {% else %}
-                <span class="badge bg-danger">INACTIVO</span>
-            {% endif %}
-        </li>
-        <li><strong>Protección ASLR (Kernel):</strong> Nivel {{ datos.hardening.kernel_aslr.valor }} 
-            {% if datos.hardening.kernel_aslr.estado == 'SEGURO' %}<span class="badge bg-safe">SEGURO</span>{% else %}<span class="badge bg-danger">PELIGROSO</span>{% endif %}
-        </li>
-    </ul>
+    <h2 class="subsection-title">5. Control de Acceso y Memoria</h2>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 20%;">Mecanismo MAC</th>
+                <th style="width: 20%;" class="text-center">Estado del Servicio</th>
+                <th style="width: 30%;" class="text-center">Perfiles Estrictos (Enforce)</th>
+                <th style="width: 30%;" class="text-center">Perfiles en Observación (Complain)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>AppArmor</strong></td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        <span class="badge bg-info">DETECTADO</span>
+                    {% else %}
+                        <span class="badge bg-secondary">NO INSTALADO</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        {% if datos.hardening.mac.apparmor.enforce > 0 %}
+                            <span class="text-safe-bold">{{ datos.hardening.mac.apparmor.enforce }} Activos</span>
+                        {% else %}
+                            <span class="text-danger-bold">0 Activos</span>
+                        {% endif %}
+                    {% else %}<span class="text-muted">-</span>{% endif %}
+                </td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        {% if datos.hardening.mac.apparmor.complain > 0 %}
+                            <span class="text-warn-bold">{{ datos.hardening.mac.apparmor.complain }} en Observación</span>
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
+                    {% else %}<span class="text-muted">-</span>{% endif %}
+                </td>
+            </tr>
+            
+            <tr>
+                <td><strong>SELinux</strong></td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.selinux.activo %}
+                        <span class="badge bg-info">DETECTADO</span>
+                    {% else %}
+                        <span class="badge bg-secondary">NO INSTALADO</span>
+                    {% endif %}
+                </td>
+                <td colspan="2" class="text-center">
+                    {% if datos.hardening.mac.selinux.activo %}
+                        {% if datos.hardening.mac.selinux.modo == 'Enforcing' %}
+                            <span class="text-safe-bold">Modo Estricto (Enforcing)</span>
+                        {% else %}
+                            <span class="text-warn-bold">Modo Aviso (Permissive)</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
-    <h2 class="subsection-title">7. Firewall y Criptografía</h2>
-    <div class="info-box">
-        <strong>Estado del Firewall:</strong> {{ datos.hardening.firewall.firewall_activo }}<br>
-        {% for alerta in datos.hardening.firewall.alertas %}
-            <span style="color:#e74c3c;">[!] {{ alerta }}</span><br>
-        {% endfor %}
-    </div>
+    
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Randomización del Espacio de Direcciones (ASLR)</h3>
+    
+    {% if datos.hardening.kernel_aslr.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Protección ASLR Activa:</strong> El Kernel tiene activada la randomización de memoria en el nivel óptimo (Nivel {{ datos.hardening.kernel_aslr.valor }}). 
+            Esta configuración dificulta que un atacante prediga las direcciones de memoria de las librerías y la pila, mitigando ataques de explotación como desbordamientos de búfer.
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Riesgo en Protección ASLR:</strong> La randomización de memoria está desactivada o configurada en un nivel insuficiente (Nivel {{ datos.hardening.kernel_aslr.valor }}). 
+            Sin una randomización adecuada, las direcciones de memoria son estáticas, lo que facilita enormemente el éxito de exploits de tipo <em>Return-Oriented Programming</em> (ROP).
+        </div>
+    {% endif %}
+
+    <h2 class="subsection-title">6. Firewall y Criptografía</h2>
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">7.1. Gestores de Firewall (Systemd)</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Servicio</th>
+                <th class="text-center" style="width: 30%;">Estado Actual</th>
+                <th class="text-center" style="width: 30%;">Persistencia (Arranque)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for srv in datos.hardening.firewall.servicios %}
+            <tr>
+                <td><strong>{{ srv.nombre }}</strong></td>
+                <td class="text-center">
+                    <span class="badge {% if srv.activo %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'ACTIVO' if srv.activo else 'INACTIVO' }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge {% if srv.arranque == 'enabled' %}bg-info{% else %}bg-warning{% endif %}">
+                        {{ srv.arranque | upper }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-top: 20px; margin-bottom: 8px;">
+        7.2. Filtrado de Paquetes en el Kernel ({{ datos.hardening.firewall.kernel.tipo_filtro }})
+    </h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 35%;">Métrica de Red</th>
+                <th class="text-center" style="width: 25%;">Estado / Valor</th>
+                <th class="text-center" style="width: 40%;">Evaluación de Riesgo</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Reglas de Bloqueo Detectadas</td>
+                <td class="text-center"><strong>{{ datos.hardening.firewall.kernel.reglas_bloqueo }}</strong></td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.reglas_bloqueo > 0 %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'CORRECTO' if datos.hardening.firewall.kernel.reglas_bloqueo > 0 else 'SISTEMA EXPUESTO' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Política por defecto (INPUT)</td>
+                <td class="text-center">{{ 'ACCEPT' if datos.hardening.firewall.kernel.politica_accept else 'DROP / REJECT' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.politica_accept %}bg-danger{% else %}bg-safe{% endif %}">
+                        {{ 'PELIGROSO (PERMISIVO)' if datos.hardening.firewall.kernel.politica_accept else 'SEGURO (RESTRICTIVO)' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Filtrado de Salida (OUTPUT)</td>
+                <td class="text-center">{{ 'Activo' if datos.hardening.firewall.kernel.bloqueo_output else 'No detectado' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.bloqueo_output %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ 'OK' if datos.hardening.firewall.kernel.bloqueo_output else 'ADVERTENCIA' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Filtrado de Reenvío (FORWARD)</td>
+                <td class="text-center">{{ 'Activo' if datos.hardening.firewall.kernel.bloqueo_forward else 'No detectado' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.bloqueo_forward %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ 'OK' if datos.hardening.firewall.kernel.bloqueo_forward else 'ADVERTENCIA' }}
+                    </span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-top: 20px;">7.3. Diagnóstico de Cumplimiento</h3>
+    {% if datos.hardening.firewall.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Sistema Protegido:</strong> El tráfico de red está siendo filtrado mediante reglas activas.
+            {% if datos.hardening.firewall.alertas %}
+                <br><span style="font-size: 8pt; color: #555;">Observaciones: {{ datos.hardening.firewall.alertas | join(', ') }}.</span>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Sistema Expuesto:</strong> No se han detectado reglas de filtrado activas. El tráfico de red no está siendo supervisado y el sistema es vulnerable a conexiones externas no autorizadas.
+        </div>
+    {% endif %}
 
     <div class="info-box">
         <strong>Cifrado de Discos (FDE/LUKS):</strong> 

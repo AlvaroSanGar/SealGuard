@@ -262,3 +262,38 @@ ul { margin-top: 5px; padding-left: 20px; }
     margin-right: 2px;
     white-space: nowrap;
 }
+
+/* --- SECCIÓN MFA / 2FA --- */
+.table-details-list {
+    margin: 0;
+    padding-left: 15px;
+    list-style-type: disc;
+    font-size: 8.5pt;
+    color: #555;
+}
+
+.col-mfa-status { width: 15%; text-align: center; }
+.col-mfa-details { width: 55%; }
+.col-token-status { width: 20%; text-align: center; }
+
+
+/* --- UTILIDADES DE TEXTO Y ESTADOS --- */
+.text-safe-bold { color: #27ae60; font-weight: bold; }
+.text-warn-bold { color: #f39c12; font-weight: bold; }
+.text-danger-bold { color: #e74c3c; font-weight: bold; }
+.text-muted { color: #999; }
+.bg-secondary { background-color: #95a5a6; } 
+
+
+
+/* --- FIREWALL STYLES --- */
+.status-indicator {
+    font-weight: bold;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+.status-on { background-color: #27ae60; }
+.status-off { background-color: #e74c3c; }

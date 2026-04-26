@@ -1,27 +1,54 @@
 import os
 import time
+import pwd  # Librería para obtener detalles de usuarios en Unix
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML, CSS
+
+def obtener_ruta_escritorio_real():
+    """
+    Detecta el usuario original incluso si se ejecuta con sudo
+    y devuelve la ruta a su escritorio.
+    """
+    # Si estamos en sudo, la variable SUDO_USER nos dice quién lanzó el comando
+    user_logueado = os.environ.get('SUDO_USER')
+    
+    if user_logueado:
+        # Obtenemos el home directory del usuario original
+        home_usuario = pwd.getpwnam(user_logueado).pw_dir
+    else:
+        # Si no hay sudo, usamos el home del usuario actual
+        home_usuario = os.path.expanduser("~")
+        
+    ruta_desktop = os.path.join(home_usuario, "Desktop")
+    
+    # Verificamos si existe la carpeta Desktop (en algunos sistemas puede llamarse 'Escritorio')
+    if not os.path.exists(ruta_desktop):
+        # Fallback: Si no hay escritorio, devolvemos el home directamente
+        # o intentamos 'Escritorio' en español
+        variante_es = os.path.join(home_usuario, "Escritorio")
+        if os.path.exists(variante_es):
+            return variante_es
+        return home_usuario
+        
+    return ruta_desktop
 
 def generar_informe(fecha, datos):
     print("\n[+] Inicializando motor de generación de reportes (Jinja2 + WeasyPrint)...")
     
-    # Generamos un ID de reporte único basado en el timestamp actual
     id_reporte = "CRA-" + str(int(time.time()))
     
-    # IMPORTANTE: Nos aseguramos de que la carpeta 'output' exista antes de guardar nada
-    os.makedirs('output', exist_ok=True)
+    # [CORREGIDO] Usamos la nueva función para encontrar el escritorio real
+    ruta_escritorio = obtener_ruta_escritorio_real()
     
-    # Definimos las rutas de salida en la carpeta output
-    ruta_pdf = os.path.join('output', f'Reporte_{id_reporte}.pdf')
-    ruta_html_debug = os.path.join('output', 'debug_report.html')
+    # Definimos la ruta de salida del PDF
+    ruta_pdf = os.path.join(ruta_escritorio, f'Reporte_CRA_{id_reporte}.pdf')
     
     try:
-        # 1. Configurar Jinja2 para cargar el HTML desde la carpeta 'templates'
+        # 1. Configurar Jinja2
         env = Environment(loader=FileSystemLoader('templates'))
         plantilla = env.get_template('report_template.html')
 
-        # 2. Renderizar el HTML inyectando tu diccionario de Python
+        # 2. Renderizar el HTML
         print("     [i] Inyectando datos de la auditoría en la plantilla HTML...")
         html_renderizado = plantilla.render(
             id=id_reporte,
@@ -29,25 +56,18 @@ def generar_informe(fecha, datos):
             datos=datos
         )
 
-        # 3. Guardar una copia en HTML para depurar 
-        with open(ruta_html_debug, 'w', encoding='utf-8') as f:
-            f.write(html_renderizado)
-        print(f"     [i] HTML interactivo de prueba guardado en: {ruta_html_debug}")
-        print("         (Nota: Al abrir el HTML en el navegador puede verse sin diseño porque el CSS está en otra carpeta, pero el PDF saldrá bien)")
-
-        # 4. Convertir a PDF con WeasyPrint y aplicar el CSS
+        # 3. Convertir a PDF con WeasyPrint
         print("     [i] Renderizando PDF y aplicando estilos CSS...")
         
-        # [MODIFICADO] Le indicamos a Python que el CSS está dentro de la carpeta templates
         ruta_css = os.path.join('templates', 'styles.css')
         
-        # base_url='templates' hace que el logo.jpg también se busque dentro de esa carpeta
+        # Generar el PDF
         HTML(string=html_renderizado, base_url='templates').write_pdf(
             ruta_pdf,
             stylesheets=[CSS(ruta_css)]
         )
 
-        print(f"[V] ¡Éxito! Reporte final generado y guardado en: {ruta_pdf}\n")
+        print(f"[V] ¡Éxito! Reporte generado en: {ruta_pdf}\n")
 
     except Exception as e:
         print(f"[ERROR] Fallo crítico al generar el informe: {e}")
