@@ -370,17 +370,17 @@ def auditar_firewall(verbose):
                     
                     # Comprobamos si no está configurado para arrancar al iniciar el sistema
                     if estado_arranque != 'enabled':
-                        alerta = "El gestor '" + nombre + "' está encendido ahora, pero no arrancará tras un reinicio (estado: " + str(estado_arranque) + ")"
+                        alerta = "El gestor '" + nombre + "' se encuentra activo, pero no se ha configurado que arranque al reiniciarse el sistema"
                         resultado["alertas"].append(alerta)
                         if verbose:
                             print("     [!] " + alerta)
                     else:
                         if verbose:
-                            print("     [V] El gestor '" + nombre + "' está ACTIVO y habilitado de forma persistente (enabled)")
+                            print("     [V] El gestor '" + nombre + "' está activo y arranca por defecto en el sistema")
                             
                 # Caso de que esté configurado para arrancar siempre, pero actualmente está apagado o caído
                 elif estado_arranque == 'enabled' and estado_actu != 'active':
-                    alerta = "El gestor '" + nombre + "' debería estar encendido de forma persistente (enabled), pero actualmente está APAGADO."
+                    alerta = "El gestor '" + nombre + "' debería estar encendido cada vez que se reinicia el sistema, pero actualmente está apagado"
                     resultado["alertas"].append(alerta)
                     if verbose:
                         print("     [!] " + alerta)
@@ -445,10 +445,14 @@ def auditar_firewall(verbose):
                 # Convertimos toda la salida a minúsculas para buscar fácilmente
                 salida_nft = res_nft.stdout.lower()
                 
-                if "policy accept" in salida_nft: politica_accept = True
-                if "drop" in salida_nft or "reject" in salida_nft: reglas_bloqueo += 1
-                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): bloqueo_output = True
-                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): bloqueo_forward = True
+                if "policy accept" in salida_nft: 
+                    politica_accept = True
+                if "drop" in salida_nft or "reject" in salida_nft: 
+                    reglas_bloqueo += 1
+                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): 
+                    bloqueo_output = True
+                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): 
+                    bloqueo_forward = True
             elif verbose:
                 print("     [DEBUG] nft devolvió error: " + res_nft.stderr.strip().replace('\n', ' '))
         except FileNotFoundError:
@@ -458,8 +462,9 @@ def auditar_firewall(verbose):
             if verbose:
                 print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
 
+    # Caso de que no haya ninguno de los 2 gestores
     if not iptables_funciona and not nftables_funciona:
-        alerta_desc = "No se ha detectado IPtables ni Nftables instalados en el sistema (Estado de red desconocido)"
+        alerta_desc = "No se ha detectado un gestor de red conocido (NFtables o IPtables)"
         resultado["alertas"].append(alerta_desc)
         if verbose:
             print("     [?] " + alerta_desc)
@@ -873,12 +878,17 @@ def auditar_certificados(verbose):
 
 
 #################################################################################################################################
+import subprocess
+
 def auditar_cifrado(verbose):
     print("[+] Comprobando el cifrado de discos (LUKS/FDE)...")
     resultados = {
         "estado": "PELIGROSO",
+        "lista_particiones": [],
+        "criticos_encontrados": [], 
+        "criticos_faltantes": [],
         "detalles": [],
-        "alertas":[]
+        "alertas": []
     }
     
     # Cargamos la config del .yaml
@@ -890,7 +900,6 @@ def auditar_cifrado(verbose):
         req_algoritmo = "sha256"
         critical_mounts = ["/", "/home", "/var"]
         
-    
     query = '''
         SELECT m.device, m.device_alias, m.path, m.type, de.encryption_status, de.encrypted
         FROM mounts m
@@ -916,13 +925,15 @@ def auditar_cifrado(verbose):
             if ruta in critical_mounts:
                 criticos_encontrados.append(ruta)
             
+            es_cifrada = (str(linea.get('encrypted', '0')) == '1') or (str(linea.get('encryption_status', '')) == 'encrypted')
+            algoritmo = "desconocido"
+            advertencia_algo = ""
+
             # Comprobamos si la partición está cifrada (se indica en 2 campos)
-            if (str(linea.get('encrypted', '0')) == '1') or (str(linea.get('encryption_status', '')) == 'encrypted'):
+            if es_cifrada:
                 tot_cifradas += 1
                 if ruta in critical_mounts:
                     criticos_cifrados.append(ruta)
-                    
-                algoritmo = "desconocido"
                 
                 # Vamos a tratar de obtener el algoritmo usado para el cifrado de la partición
                 try:
@@ -935,12 +946,10 @@ def auditar_cifrado(verbose):
                     pass
                 
                 # Comprobamos si usa el algo de cifrado especificado en el .yaml                
-                advertencia_algo = ""
                 if (req_algoritmo.lower() not in algoritmo.lower()) and (algoritmo != "desconocido"):
                     advertencia_algo =" (Usa "+algoritmo+", se recomienda "+req_algoritmo+")"
                     resultados["alertas"].append("El dispositivo "+dispositivo+" no usa el algoritmo recomendado: "+algoritmo)
 
-                
                 # Completamos el campo detalles con la info obtenida
                 detalle = "El dispositivo "+str(dispositivo)+" tiene una partición cifrada con punto de montaje en "+str(ruta)+" usando el algoritmo '"+str(algoritmo)+"'"+advertencia_algo
                 resultados["detalles"].append(detalle)
@@ -949,21 +958,29 @@ def auditar_cifrado(verbose):
                     print("     [!] "+str(detalle))
                 elif verbose: 
                     print("     [V] "+str(detalle))
-        
-        
+            
             # En el caso de que la partición no esté cifrada
             else:
                 alerta = "El dispositivo "+str(dispositivo)+" tiene una partición sin cifrar con punto de montaje en "+str(ruta)
                 resultados["alertas"].append(alerta)
                 if verbose:
                     print("     [X] "+str(alerta))
+
+            # Guardamos los datos estructurados
+            resultados["lista_particiones"].append({
+                "dispositivo": dispositivo,
+                "ruta": ruta,
+                "cifrada": es_cifrada,
+                "algoritmo": algoritmo,
+                "advertencia": advertencia_algo != ""
+            })
      
-     
-                    
     ######################## Catalogamos los resultados ######################################################################################
     
     # Sacamos las particiones críticas que existen en el sistema pero no están cifrados
     criticos_vulnerables = [m for m in criticos_encontrados if m not in criticos_cifrados]
+    resultados["criticos_faltantes"] = criticos_vulnerables
+    resultados["criticos_encontrados"] = criticos_encontrados
     
     if tot_particiones == 0:
         resultados["alertas"].append("No se detectaron particiones físicas válidas para auditar.")
@@ -982,7 +999,6 @@ def auditar_cifrado(verbose):
         resultados["alertas"].append(alerta_peligro)
         if verbose: print("     [X] PELIGRO: " + alerta_peligro)
         
-    
     return resultados
 
 

@@ -123,7 +123,7 @@ def verificar_integridad(verbose):
     # Comparamos los resultados obtenidos con los guardados
     print("\n   [+] Comenzado la comparación entre resultados obtenidos y los almacenados")
     for archi, resul in guardados.items():
-        
+        detalles_cambio = []
         if archi not in comp:
             estado = "INACCESIBLE / BORRADO"
             if verbose:
@@ -136,12 +136,23 @@ def verificar_integridad(verbose):
         
         else:
             estado = "MODIFICADO"
+            # Conseguimos el parametro/os que ha cambiodo
+            if resul.get("hash") != comp[archi].get("hash"):
+                detalles_cambio.append("hash")
+            
+            if resul.get("mtime") != comp[archi].get("mtime"):
+                detalles_cambio.append("mtime")
+            
+            if resul.get("ctime") != comp[archi].get("ctime"):
+                detalles_cambio.append("ctime")
+                
             if verbose:
-                print("     [X] " + archi + " -> " + estado)
+                print("     [X] " + archi + " -> " + estado + " (Cambios en: " + ", ".join(detalles_cambio) + ")")
             
         resultados.append({
             "archivo": archi,
-            "estado": estado
+            "estado": estado,
+            "detalles_cambio": detalles_cambio
         })
         
     # Comprobamos si todos los archivos obtenidos están en el listado guardado
@@ -149,7 +160,8 @@ def verificar_integridad(verbose):
         if ruta_actual not in guardados:
             resultados.append({
                 "archivo": ruta_actual,
-                "estado": "NO_RASTREADO"
+                "estado": "NO_RASTREADO",
+                "detalles_cambio": []
             })
             if verbose:
                 print("     [!] El archivo '"+ruta_actual+"' no está en el listado del escaneo baseline")

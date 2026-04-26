@@ -61,7 +61,7 @@
     {% set danger_pct = (danger_count / total_controles * 100) if total_controles > 0 else 0 %}
 
 
-    <h1 id="resumen" class="section-title" style="page-break-before: avoid;">Resumen Ejecutivo de Cumplimiento</h1>
+    <h1 id="resumen" class="section-title">Resumen Ejecutivo de Cumplimiento</h1>
     <p>A continuación se muestra un breve resumen de los datos obtenidos sobre el equipo, este documento facilitará la tarea de auditar un sistema siguiendo los requisitos especificados en el anexo I de la CRA.</p>
     
     <table class="summary-layout-table">
@@ -504,8 +504,8 @@
         </div>
     {% endif %}
 
-    <h2 class="subsection-title">6. Firewall y Criptografía</h2>
-    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">7.1. Gestores de Firewall (Systemd)</h3>
+    <h2 class="subsection-title">6. Firewall</h2>
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">6.1. Gestores de Firewall (Systemd)</h3>
     <table class="data-table text-xs table-fixed">
         <thead>
             <tr>
@@ -534,7 +534,7 @@
     </table>
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-top: 20px; margin-bottom: 8px;">
-        7.2. Filtrado de Paquetes en el Kernel ({{ datos.hardening.firewall.kernel.tipo_filtro }})
+        6.2. Filtrado de Paquetes en el Kernel ({{ datos.hardening.firewall.kernel.tipo_filtro }})
     </h3>
     <table class="data-table text-xs table-fixed">
         <thead>
@@ -584,7 +584,6 @@
         </tbody>
     </table>
 
-    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-top: 20px;">7.3. Diagnóstico de Cumplimiento</h3>
     {% if datos.hardening.firewall.estado == 'SEGURO' %}
         <div class="success-box">
             <strong>Sistema Protegido:</strong> El tráfico de red está siendo filtrado mediante reglas activas.
@@ -598,54 +597,147 @@
         </div>
     {% endif %}
 
-    <div class="info-box">
-        <strong>Cifrado de Discos (FDE/LUKS):</strong> 
-        {% if datos.hardening.cifrado.estado == 'SEGURO' %}<span class="badge bg-safe">SEGURO</span>{% else %}<span class="badge bg-danger">VULNERABLE</span>{% endif %}
-        <ul>
-            {% for alerta in datos.hardening.cifrado.alertas %}<li>{{ alerta }}</li>{% endfor %}
-            {% for det in datos.hardening.cifrado.detalles %}<li>{{ det }}</li>{% endfor %}
-        </ul>
-    </div>
+<h2 class="subsection-title">7. Cifrado de Almacenamiento</h2>
+    
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Análisis de Particiones Físicas</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th class="col-disk">Dispositivo</th>
+                <th class="col-mount">Montaje</th>
+                <th class="col-enc-status">Estado Cifrado</th>
+                <th class="col-algo">Especificaciones de Cifrado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for part in datos.hardening.cifrado.lista_particiones %}
+            <tr>
+                <td><strong>{{ part.dispositivo }}</strong></td>
+                <td><code>{{ part.ruta }}</code></td>
+                <td class="text-center">
+                    <span class="badge {% if part.cifrada %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'CIFRADO' if part.cifrada else 'SIN CIFRAR' }}
+                    </span>
+                </td>
+                <td>
+                    {% if part.cifrada %}
+                        <span class="font-mono">{{ part.algoritmo }}</span>
+                        {% if part.advertencia %}
+                            <span class="text-warn-algo">Algoritmo no recomendado según política</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">N/A</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if datos.hardening.cifrado.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Protección Completa:</strong> Todos los puntos de montaje críticos identificados en el sistema ({{ datos.hardening.cifrado.criticos_encontrados | join(', ') }}) se encuentran debidamente cifrados. El riesgo de acceso físico a datos en reposo está mitigado.
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Brecha de Seguridad Detectada:</strong> Se han localizado puntos de montaje críticos sin cifrado de disco activo.
+            <br>
+            <strong>Faltantes:</strong> 
+            {% if datos.hardening.cifrado.criticos_faltantes %}
+                <span class="text-danger-bold">{{ datos.hardening.cifrado.criticos_faltantes | join(', ') }}</span>
+            {% else %}
+                <span class="text-danger-bold">No se detectó cifrado en ninguna partición crítica.</span>
+            {% endif %}
+            <p style="margin-top: 8px; font-size: 9pt;">Se recomienda encarecidamente el uso de LUKS para proteger la confidencialidad de la información ante la pérdida o robo físico del equipo.</p>
+        </div>
+    {% endif %}
 
 
-    <h2 class="subsection-title">8. Permisos de Archivos Críticos</h2>
-    <table class="data-table">
-        <tr><th>Ruta del Archivo</th><th>Estado</th><th>Detalles / Problemas</th></tr>
-        {% for archivo in datos.hardening.archivos_criticos %}
-        <tr>
-            <td><strong>{{ archivo.archivo }}</strong></td>
-            <td>
-                {% if archivo.estado == 'SEGURO' %}<span class="badge bg-safe">OK</span>
-                {% elif archivo.estado == 'NO ENCONTRADO' %}<span class="badge bg-warning">MISSING</span>
-                {% else %}<span class="badge bg-danger">RIESGO</span>{% endif %}
-            </td>
-            <td>
-                {% if archivo.problemas is string %}{{ archivo.problemas }}{% else %}{{ archivo.problemas | join(', ') }}{% endif %}
-            </td>
-        </tr>
-        {% endfor %}
+<h2 class="subsection-title">8. Permisos de Archivos Críticos</h2>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Ruta del Archivo</th>
+                <th class="text-center" style="width: 15%;">Estado</th>
+                <th style="width: 55%;">Problemas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for archivo in datos.hardening.archivos_criticos %}
+            <tr>
+                <td class="col-path"><strong>{{ archivo.archivo }}</strong></td>
+                <td class="text-center">
+                    {% if archivo.estado == 'SEGURO' %}
+                        <span class="badge bg-safe">OK</span>
+                    {% elif archivo.estado == 'NO ENCONTRADO' %}
+                        <span class="badge bg-warning">MISSING</span>
+                    {% else %}
+                        <span class="badge bg-danger">RIESGO</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if archivo.problemas %}
+                        <ul class="table-details-list">
+                            {% if archivo.problemas is string %}
+                                <li>{{ archivo.problemas }}</li>
+                            {% else %}
+                                {% for prob in archivo.problemas %}
+                                    <li>{{ prob }}</li>
+                                {% endfor %}
+                            {% endif %}
+                        </ul>
+                    {% else %}
+                        <span class="text-muted">Permisos y propietario configurados correctamente.</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
 
 
     <h1 id="anexo-4" class="section-title">Anexo IV: Integridad y Arranque</h1>
 
-    <h2 class="subsection-title">9. Monitorización de Integridad (Baseline)</h2>
-    <table class="data-table">
-        <tr><th>Archivo Monitoreado</th><th>Estado de Integridad</th></tr>
-        {% for archivo in datos.integridad %}
-        <tr>
-            <td>{{ archivo.archivo }}</td>
-            <td>
-                {% if archivo.estado == 'INTACTO' %}<span class="badge bg-safe">INTACTO</span>
-                {% elif archivo.estado == 'NO_RASTREADO' %}<span class="badge bg-warning">NUEVO EN SISTEMA</span>
-                {% else %}<span class="badge bg-danger">{{ archivo.estado }}</span>{% endif %}
-                
-                {% if archivo.detalle_cambio %}<br><span style="font-size: 8pt; color: #e74c3c;">Cambio en: {{ archivo.detalle_cambio }}</span>{% endif %}
-            </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="2" class="text-center">No se detectó un archivo baseline (history/escaneo_baseline.json).</td></tr>
-        {% endfor %}
+    <h2 class="subsection-title">9. Monitorización de Integridad</h2>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 45%;">Archivo Monitoreado</th>
+                <th class="text-center" style="width: 25%;">Estado de Integridad</th>
+                <th style="width: 30%;">Parámetros Modificados</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for archivo in datos.integridad %}
+            <tr>
+                <td class="col-path"><strong>{{ archivo.archivo }}</strong></td>
+                <td class="text-center">
+                    {% if archivo.estado == 'INTACTO' %}
+                        <span class="badge bg-safe">INTACTO</span>
+                    {% elif archivo.estado == 'NO_RASTREADO' %}
+                        <span class="badge bg-warning">NUEVO</span>
+                    {% elif archivo.estado == 'INACCESIBLE / BORRADO' %}
+                        <span class="badge bg-danger">BORRADO</span>
+                    {% else %}
+                        <span class="badge bg-danger">{{ archivo.estado }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if archivo.detalles_cambio and archivo.detalles_cambio|length > 0 %}
+                        <ul class="table-details-list">
+                            {% for cambio in archivo.detalles_cambio %}
+                                <li>{{ cambio }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <span class="text-muted">---</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted">No se detectó un archivo baseline (history/escaneo_baseline.json).</td></tr>
+            {% endfor %}
+        </tbody>
     </table>
 
     <h2 class="subsection-title">10. Arranque Seguro (Booting)</h2>

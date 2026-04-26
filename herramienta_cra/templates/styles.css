@@ -297,3 +297,17 @@ ul { margin-top: 5px; padding-left: 20px; }
 }
 .status-on { background-color: #27ae60; }
 .status-off { background-color: #e74c3c; }
+
+
+/* --- CIFRADO DE DISCOS --- */
+.col-disk { width: 25%; }
+.col-mount { width: 15%; }
+.col-enc-status { width: 20%; text-align: center; }
+.col-algo { width: 40%; }
+
+.text-warn-algo {
+    color: #d35400;
+    font-size: 7.5pt;
+    display: block;
+    margin-top: 2px;
+}
