@@ -12,8 +12,8 @@ def calcular_resumen_dinamico(datos):
 
     # Exposición de Red
     puertos = datos.get("puertos", [])
-    # Filtramos para buscar solo los puertos que no tienen el estado 'ACEPTADO'
-    puertos_peligrosos = [p for p in puertos if p.get("estado", "") != "ACEPTADO"]
+    # [ROBUSTEZ] Usamos .upper() y .strip() para que no fallen las comparaciones por espacios o minúsculas
+    puertos_peligrosos = [p for p in puertos if str(p.get("estado", "")).strip().upper() != "ACEPTADO"]
     
     if len(puertos_peligrosos) == 0:
         resumen.append({"nombre": "1. Exposición de Red", "estado": "SEGURO", "clase": "bg-safe"})
