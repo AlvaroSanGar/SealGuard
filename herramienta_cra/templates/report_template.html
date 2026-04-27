@@ -353,9 +353,13 @@
             <tr>
                 <td><strong>{{ servicio }}</strong></td>
                 <td class="text-center">
-                    <span class="badge {% if info.protegido %}bg-safe{% else %}bg-danger{% endif %}">
-                        {% if info.protegido %}PROTEGIDO{% else %}VULNERABLE{% endif %}
-                    </span>
+                    {% if "Servicio no detectado en el sistema" in info.detalles %}
+                        <span class="badge bg-secondary">NO INSTALADO</span>
+                    {% else %}
+                        <span class="badge {% if info.protegido %}bg-safe{% else %}bg-danger{% endif %}">
+                            {% if info.protegido %}PROTEGIDO{% else %}VULNERABLE{% endif %}
+                        </span>
+                    {% endif %}
                 </td>
                 <td>
                     <ul class="table-details-list">
@@ -370,7 +374,11 @@
     </table>
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Requisitos de Infraestructura SSH</h3>
-    {% if datos['2FA'].ssh_config_valido %}
+    
+    {# Comprobamos si el servicio sshd está marcado como no detectado en la lista de servicios #}
+    {% if "Servicio no detectado en el sistema" in datos['2FA'].servicios['sshd'].detalles %}
+        <div class="info-box"><strong>Configuración SSH:</strong> El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA.</div>
+    {% elif datos['2FA'].ssh_config_valido %}
         <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
     {% else %}
         <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
