@@ -189,28 +189,40 @@ def comp_2FA(verbose, usuarios):
     }
     
     #######################################################################################################################
-    modulos_common = comprobar("/etc/pam.d/common-auth", modulos_2fa)
-    if modulos_common:
-        reporte_2fa["mfa_global"] = True
-        if verbose:
-            print("     [i] Se han hayado los siguientes módulos en /etc/pam.d/common-auth:")
-            for m in modulos_common:
-                print("         - "+str(m))
+    if os.path.exists("/etc/pam.d/common-auth"):
+        modulos_common = comprobar("/etc/pam.d/common-auth", modulos_2fa)
+        if modulos_common:
+            reporte_2fa["mfa_global"] = True
+            if verbose:
+                print("     [i] Se han hallado los siguientes módulos en /etc/pam.d/common-auth:")
+                for m in modulos_common:
+                    print("         - "+str(m))
+    else:
+        modulos_common = []
     
             
     ################# Comprobamos si los módulos especificados en config.yaml usan la 2fa #################################
     for servicio in servicios_pam:
         arch = str("/etc/pam.d/"+str(servicio))
         
-        comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
-        confirmacion = comprobar(arch, comp)
-        if (('@include common-auth' in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+        # [NUEVO] Comprobamos si el servicio PAM existe antes de leerlo
+        if os.path.exists(arch):
+            comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
+            confirmacion = comprobar(arch, comp)
+            if (('@include common-auth' in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+                reporte_2fa['servicios'][servicio]['protegido'] = True
+                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el @include common-auth si usa la config general)
+        else:
+            # Si el servicio no está instalado, se considera seguro (no es un vector de ataque)
             reporte_2fa['servicios'][servicio]['protegido'] = True
-            reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el @include common-auth si usa la config general)
+            reporte_2fa['servicios'][servicio]['detalles'] = ["Servicio no detectado en el sistema"]
+            if verbose:
+                print("     [i] El servicio '"+servicio+"' no está instalado en el sistema")
         
     
     ################## Comprobamos si el servicio sshd tiene 2fa ###########################################################
-    if os.path.exists("/etc/ssh"):
+    # [CORREGIDO] Comprobamos que exista el archivo de configuración del servidor SSH, no solo la carpeta
+    if os.path.exists("/etc/ssh/sshd_config"):
         comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
         if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
             reporte_2fa["ssh_config_valido"] = True
@@ -222,7 +234,7 @@ def comp_2FA(verbose, usuarios):
     else:
         reporte_2fa["ssh_config_valido"] = True
         if verbose:
-            print("     [V] No se ha detectado el servicio SSHinstalado en el sistema, por lo que se considera seguro")
+            print("     [i] El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA")
     
     
 
@@ -231,15 +243,14 @@ def comp_2FA(verbose, usuarios):
         print("     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
     
     # Cargamos los módulos activos para después comprobar si los tokens pertenecen a uno de los servicios activos 
-    # Lo hacemos en un set para evitar duplicados al reoger los servicios activos de 'detalles'
+    # Lo hacemos en un set para evitar duplicados al recoger los servicios activos de 'detalles'
     modulos_activos = set(modulos_common if modulos_common else [])
     
     # Obtenemos el módulo que protege cada servicio concreto
     for s in reporte_2fa['servicios'].values():
         modulos_activos.update(s['detalles'])
        
-    # A continuación vamos a comprobar para la lista de usuarios cuales tienen un token de 2fa activo en su directorio base (para que lo consideremos activo
-    # tiene que pertenecer a un módulo que a su vez esté activo)
+    # A continuación vamos a comprobar para la lista de usuarios cuales tienen un token de 2fa activo en su directorio base
     for usu in usuarios or []:
         directorio_home = usu.get("directory")
         nombre = usu.get("username")

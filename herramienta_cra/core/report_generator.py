@@ -158,6 +158,14 @@ def generar_informe(fecha, datos):
             stylesheets=[CSS(ruta_css)]
         )
 
+        # [NUEVO] Traspaso de propiedad del archivo al usuario real
+        user_logueado = os.environ.get('SUDO_USER')
+        if user_logueado:
+            # Obtenemos la información del usuario que lanzó el sudo
+            user_info = pwd.getpwnam(user_logueado)
+            # Cambiamos el dueño (uid) y el grupo (gid) del archivo PDF recién creado
+            os.chown(ruta_pdf, user_info.pw_uid, user_info.pw_gid)
+
         print(f"[V] ¡Éxito! Reporte generado en: {ruta_pdf}\n")
 
     except Exception as e:

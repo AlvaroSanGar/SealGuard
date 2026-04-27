@@ -118,14 +118,14 @@ hardening:
       - "ecdsa-with-SHA384"
     rutas_criticas:
     # Estas rutas son de ejemplo, generamos un certificado válido y otro peligrosos (para usar la herramienta sustituyalo con la estructura indicada)
-      - path: "/tmp/cert_malo.pem"
-        tipo: "publico"
-        max_permissions: "644"
-        owner: "root"
-      - path: "/tmp/clave_mala.pem"
-        tipo: "privado"
-        max_permissions: "600"
-        owner: "root"
+#     - path: "/tmp/cert_malo.pem"
+#       tipo: "publico"
+#       max_permissions: "644"
+#       owner: "root"
+#     - path: "/tmp/clave_mala.pem"
+#       tipo: "privado"
+#       max_permissions: "600"
+#       owner: "root"
 
   encryption: 
     algoritmo: "sha256"
