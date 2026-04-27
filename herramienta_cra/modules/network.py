@@ -31,6 +31,16 @@ def escaneo_puertos(lista_ips, verbose):
 
         if len(nm.all_hosts()) == 0:
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
+            resultados.append({
+                "ip": ip,  
+                "puerto": "-",
+                "protocolo": "-",
+                "servicio": "-",
+                "detalle": "-",
+                "estado": "ACEPTADO",
+                "mensaje": "-",
+                "peligro": "BAJO"
+            })
             continue # Pasamos a la siguiente iteración
 
         mensaje_p_encontrados = False
@@ -93,6 +103,16 @@ def escaneo_puertos(lista_ips, verbose):
                     })
                     
         if not mensaje_p_encontrados:
+            resultados.append({
+                "ip": ip,  
+                "puerto": "-",
+                "protocolo": "-",
+                "servicio": "-",
+                "detalle": "-",
+                "estado": "ACEPTADO",
+                "mensaje": "-",
+                "peligro": "BAJO"
+            })
             print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
 
     print("\n[-] Finalizando módulo de networking")
