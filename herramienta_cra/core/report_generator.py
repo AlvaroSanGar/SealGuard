@@ -10,9 +10,9 @@ def calcular_resumen_dinamico(datos):
     total_advertencias = 0
     total_criticos = 0
 
-    # 1. Exposición de Red
+    # Exposición de Red
     puertos = datos.get("puertos", [])
-    # Filtramos para buscar solo los puertos que NO tienen el estado 'ACEPTADO'
+    # Filtramos para buscar solo los puertos que no tienen el estado 'ACEPTADO'
     puertos_peligrosos = [p for p in puertos if p.get("estado", "") != "ACEPTADO"]
     
     if len(puertos_peligrosos) == 0:
@@ -25,7 +25,7 @@ def calcular_resumen_dinamico(datos):
         resumen.append({"nombre": "1. Exposición de Red", "estado": "PELIGRO", "clase": "bg-danger"})
         total_criticos += 1
 
-    # 2. Vulnerabilidades
+    # Vulnerabilidades
     vulns = datos.get("vulns", [])
     if len(vulns) == 0:
         resumen.append({"nombre": "2. Vulnerabilidades", "estado": "SEGURO", "clase": "bg-safe"})
@@ -34,7 +34,7 @@ def calcular_resumen_dinamico(datos):
         resumen.append({"nombre": "2. Vulnerabilidades", "estado": "PELIGRO", "clase": "bg-danger"})
         total_criticos += 1
 
-    # 3. Integridad del Sistema
+    # Integridad del Sistema
     integridad = datos.get("integridad", [])
     int_riesgos = [i for i in integridad if i.get("estado", "") != "INTACTO"]
     
@@ -85,17 +85,17 @@ def calcular_resumen_dinamico(datos):
         else:
             return {"nombre": nombre, "estado": "PELIGRO", "clase": "bg-danger"}
 
-    # 4. Identidad y Accesos
+    # Identidad y Accesos
     mod_identidad = {"pol": datos.get("politicas_contra", {}), "usu": datos.get("usuarios", []), "mfa": datos.get("2FA", {})}
     res_identidad = analizar_modulo_complejo("4. Identidad y Accesos", mod_identidad)
     
-    # 5. Hardening General
+    # Hardening General
     res_hardening = analizar_modulo_complejo("5. Hardening General", datos.get("hardening", {}))
     
-    # 6. Arranque Seguro
+    # Arranque Seguro
     res_boot = analizar_modulo_complejo("6. Arranque Seguro", datos.get("boot", datos.get("booting", {})))
     
-    # 7. Resiliencia
+    # Resiliencia
     res_disp = analizar_modulo_complejo("7. Resiliencia (Disponibilidad)", datos.get("disponibilidad", {}))
 
     # Volcamos los resultados y sumamos las métricas
@@ -129,9 +129,10 @@ def obtener_ruta_escritorio_real():
         return home_usuario
     return ruta_desktop
 
-def generar_informe(fecha, datos):
-    print("\n[+] Inicializando motor de generación de reportes (Jinja2 + WeasyPrint)...")
-    
+
+
+
+def generar_informe(fecha, datos):    
     # Invocamos el cálculo antes de renderizar
     calcular_resumen_dinamico(datos)
     
@@ -143,14 +144,12 @@ def generar_informe(fecha, datos):
         env = Environment(loader=FileSystemLoader('templates'))
         plantilla = env.get_template('report_template.html')
 
-        print("     [i] Inyectando datos de la auditoría en la plantilla HTML...")
         html_renderizado = plantilla.render(
             id=id_reporte,
             fecha=fecha,
             datos=datos
         )
 
-        print("     [i] Renderizando PDF y aplicando estilos CSS...")
         ruta_css = os.path.join('templates', 'styles.css')
         
         HTML(string=html_renderizado, base_url='templates').write_pdf(
@@ -158,7 +157,7 @@ def generar_informe(fecha, datos):
             stylesheets=[CSS(ruta_css)]
         )
 
-        # [NUEVO] Traspaso de propiedad del archivo al usuario real
+        # Traspaso de propiedad del archivo al usuario real
         user_logueado = os.environ.get('SUDO_USER')
         if user_logueado:
             # Obtenemos la información del usuario que lanzó el sudo
@@ -166,7 +165,7 @@ def generar_informe(fecha, datos):
             # Cambiamos el dueño (uid) y el grupo (gid) del archivo PDF recién creado
             os.chown(ruta_pdf, user_info.pw_uid, user_info.pw_gid)
 
-        print(f"[V] ¡Éxito! Reporte generado en: {ruta_pdf}\n")
+        print(f"[V] Reporte generado en: {ruta_pdf}\n")
 
     except Exception as e:
         print(f"[ERROR] Fallo crítico al generar el informe: {e}")
