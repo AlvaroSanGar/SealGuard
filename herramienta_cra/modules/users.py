@@ -185,6 +185,7 @@ def comp_2FA(verbose, usuarios):
         'mfa_global': False,
         'servicios': {servicio: {'protegido': False, 'detalles': []} for servicio in servicios_pam},
         'ssh_config_valido': False,
+        'ssh_instalado': True,
         'usuarios_token': []
     }
     
@@ -205,7 +206,7 @@ def comp_2FA(verbose, usuarios):
     for servicio in servicios_pam:
         arch = str("/etc/pam.d/"+str(servicio))
         
-        # [NUEVO] Comprobamos si el servicio PAM existe antes de leerlo
+        # Comprobamos si el servicio PAM existe antes de leerlo
         if os.path.exists(arch):
             comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
             confirmacion = comprobar(arch, comp)
@@ -221,8 +222,9 @@ def comp_2FA(verbose, usuarios):
         
     
     ################## Comprobamos si el servicio sshd tiene 2fa ###########################################################
-    # [CORREGIDO] Comprobamos que exista el archivo de configuración del servidor SSH, no solo la carpeta
+    # Comprobamos que exista el archivo de configuración del servidor SSH, no solo la carpeta
     if os.path.exists("/etc/ssh/sshd_config"):
+        reporte_2fa["ssh_instalado"] = True
         comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
         if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
             reporte_2fa["ssh_config_valido"] = True
@@ -232,7 +234,8 @@ def comp_2FA(verbose, usuarios):
             print("     [X] Configuración de SSH no válida para aplicar MFA")
     
     else:
-        reporte_2fa["ssh_config_valido"] = True
+        reporte_2fa["ssh_instalado"] = False 
+        reporte_2fa["ssh_config_valido"] = True # Mantenemos esto en true para que no reste puntos en el reporte
         if verbose:
             print("     [i] El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA")
     

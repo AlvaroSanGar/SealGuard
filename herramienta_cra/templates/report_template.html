@@ -354,7 +354,7 @@
                 <td><strong>{{ servicio }}</strong></td>
                 <td class="text-center">
                     {% if "Servicio no detectado en el sistema" in info.detalles %}
-                        <span class="badge bg-secondary">NO INSTALADO</span>
+                        <span class="badge bg-secondary">NO ENCONTRADO</span>
                     {% else %}
                         <span class="badge {% if info.protegido %}bg-safe{% else %}bg-danger{% endif %}">
                             {% if info.protegido %}PROTEGIDO{% else %}VULNERABLE{% endif %}
@@ -375,22 +375,15 @@
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Requisitos de Infraestructura SSH</h3>
     
-    {# 1. Intentamos obtener la info de sshd de forma segura #}
-    {% set info_sshd = datos['2FA'].servicios.get('sshd') %}
-    
-    {# 2. Comprobamos si el servicio existe y si fue detectado #}
-    {% if info_sshd and "Servicio no detectado en el sistema" in info_sshd.detalles %}
+    {% if not datos['2FA'].ssh_instalado %}
         <div class="info-box"><strong>Configuración SSH:</strong> El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA.</div>
-    
-    {# 3. Si no está en la lista de PAM (info_sshd es None), pero SSH está instalado, evaluamos su config #}
     {% elif datos['2FA'].ssh_config_valido %}
         <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
-    
     {% else %}
         <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
     {% endif %}
 
-    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Auditoría de Tokens de Usuario</h3>
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Auditoría de Tokens de Usuario</h3>
     <table class="data-table text-xs table-fixed">
         <thead>
             <tr>
@@ -417,7 +410,6 @@
             {% endfor %}
         </tbody>
     </table>
-
 
 
 
