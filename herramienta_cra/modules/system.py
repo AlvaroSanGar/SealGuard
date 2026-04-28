@@ -2,6 +2,8 @@ import subprocess   # Ejecutar comandos por consola
 import json
 import platform     # Sacar info del sistema
 from collections import defaultdict
+from core.colores_terminal import print_c
+
 
 # Esta función sirve para realizar una consulta con OSqueryi, devolvemos una lista de diccionarios,
 # así es mucho más fácil a la hora de recibir los datos, ponemos todos los parametros para que se capture el texto en vez
@@ -17,11 +19,11 @@ def ejecutar_consulta(query):
         return json.loads(resultado.stdout)
     
     except FileNotFoundError:
-        print("[ERROR] No se ha encontrado osqueryi")
+        print_c("[ERROR] No se ha encontrado osqueryi")
         return []
         
     except Exception as e:
-        print("[ERROR] Fallo al ejecutar consulta Osquery: "+str(e))
+        print_c("[ERROR] Fallo al ejecutar consulta Osquery: "+str(e))
         return []
     
     
@@ -37,7 +39,7 @@ def obtener_interfaces():
             check=True
         )
     except Exception as e:
-        print("[ERROR] Fallo al listar las interfaces del sistema: "+str(e)+"\n")
+        print_c("[ERROR] Fallo al listar las interfaces del sistema: "+str(e)+"\n")
         return {}
 
     interfaces = defaultdict(list)
@@ -105,9 +107,9 @@ def ESCANEO_info_Simple(verbose):
     # Info del sistema
     info = info_sis() # Es un diccionario 
     if verbose:
-        print("[+] Información del sistema: ")
-        print("     [i] Hostname:      "+info['hostname'])
-        print("     [i] Sistema:       "+info['dist']+" "+info['version'])
-        print("     [i] Kernel:        "+info['kernel'])
-        print("     [i] Arquitectura:  "+info['arquitectura']+"\n")
+        print_c("[+] Información del sistema: ")
+        print_c("     [i] Hostname:      "+info['hostname'])
+        print_c("     [i] Sistema:       "+info['dist']+" "+info['version'])
+        print_c("     [i] Kernel:        "+info['kernel'])
+        print_c("     [i] Arquitectura:  "+info['arquitectura']+"\n")
     return info

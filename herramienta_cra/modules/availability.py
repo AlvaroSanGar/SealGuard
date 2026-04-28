@@ -1,6 +1,8 @@
 import os
 from modules.system import ejecutar_consulta
 from config.settings import config
+from core.colores_terminal import print_c
+
 
 
 
@@ -8,7 +10,7 @@ from config.settings import config
 
 ###########################################################################################################################
 def auditar_backups(verbose):
-    print("[+] Auditando políticas de copias de seguridad")
+    print_c("[+] Auditando políticas de copias de seguridad")
     resultados = {
         "backups_activos": False,
         "mecanismos_encontrados": [],
@@ -21,7 +23,7 @@ def auditar_backups(verbose):
     try:
         palabras_clave = config["disponibilidad"]
     except KeyError:
-        print("     [ERROR] No se han podido cargar la configuración de disponibilidad de config.yaml")
+        print_c("     [ERROR] No se han podido cargar la configuración de disponibilidad de config.yaml")
         palabras_clave = ["backup", "rsync", "tar", "snapshot", "aws s3", "rclone"]
     
     # Usamos las condiciones de esta forma en vez de como lo hemos hecho normalmente ya que debemos usar LIKE no IN, y como LIKE solo acepta 
@@ -52,12 +54,12 @@ def auditar_backups(verbose):
             })
             
             if verbose:
-                print("     [i] "+str(detalle))
+                print_c("     [i] "+str(detalle))
     else:
         alerta = "No se han detectado tareas de backup en crontab"
         resultados["alertas"].append(alerta)
         if verbose:
-            print("     [!] "+alerta)
+            print_c("     [!] "+alerta)
     
     #### Buscamos unidades de systemd ############################################################################
     query_untis = 'SELECT * FROM systemd_units WHERE '+condiciones_desc+' OR '+condiciones_id+';'
@@ -66,7 +68,7 @@ def auditar_backups(verbose):
         alerta = 'No hay unidades de systemd asociadas a tareas de copias de seguridad'
         resultados["alertas"].append(alerta)
         if verbose:
-            print("     [!] "+alerta)
+            print_c("     [!] "+alerta)
     else:
         servicios_timer = []
         for unidad in res_units:
@@ -89,7 +91,7 @@ def auditar_backups(verbose):
                         "nombre": nombre_uni, "tipo": "Systemd Timer", "estado": estado_uni.upper(), "estado_color": "OK", "ruta": descrip_uni
                     })
                     
-                    if verbose: print("     [V] "+str(detalle))
+                    if verbose: print_c("     [V] "+str(detalle))
                 
                 else:
                     alerta = 'Se ha detectado la unidad de backup en estado '+str(estado_uni)+': '+str(nombre_uni)+' | '+str(descrip_uni)
@@ -99,20 +101,20 @@ def auditar_backups(verbose):
                         "nombre": nombre_uni, "tipo": "Systemd Timer", "estado": estado_uni.upper(), "estado_color": "RIESGO", "ruta": descrip_uni
                     })
                     
-                    if verbose: print("     [i] "+str(alerta))
+                    if verbose: print_c("     [i] "+str(alerta))
                 
             elif nombre_uni.endswith('.service'):
                 if estado_uni == 'fail' and (nombre_uni.removesuffix('.service') in resultados["mecanismos_encontrados"]):
                     alerta = 'La unidad '+str(nombre_uni)+' ha fallado en su ejecución'
                     resultados["alertas"].append(str(alerta))
-                    if verbose: print("     [!] "+str(alerta))
+                    if verbose: print_c("     [!] "+str(alerta))
                 elif not nombre_uni.removesuffix('.service') in resultados["mecanismos_encontrados"]:
                     alerta = 'Se ha detectado la unidad '+str(nombre_uni)+' la cual no tiene ningún timer asociado'
                     resultados["alertas"].append(str(alerta))
                     
                     resultados["huerfanos"].append(nombre_uni)
                     
-                    if verbose: print("     [!] "+str(alerta))
+                    if verbose: print_c("     [!] "+str(alerta))
                     
     # evaluamos el resultado
     if len(resultados["mecanismos_encontrados"]) > 0:
@@ -137,7 +139,7 @@ def auditar_backups(verbose):
 
 ##########################################################################################################################
 def auditar_protecciones_dos(verbose):
-    print("[+] Auditando protecciones del kernel contra Denegación de Servicio")
+    print_c("[+] Auditando protecciones del kernel contra Denegación de Servicio")
     resultados = {
         "estado": "PELIGROSO",
         "tcp_syncookies": False,
@@ -179,18 +181,18 @@ def auditar_protecciones_dos(verbose):
         detalle = "SYN Cookies está activado con normalidad. El kernel enviará cookies solo cuando la cola esté llena"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print("     [V] " + detalle)
+        if verbose: print_c("     [V] " + detalle)
     elif val_syncookies == "2":
         resultados["tcp_syncookies"] = True 
         alerta = "SYN Cookies está activado en modo forzado. Aunque da protección, no se recomienda ya que aumenta la carga de CPU"
         resultados["alertas"].append(alerta)
         resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "ADVERTENCIA", "desc": alerta}) 
-        if verbose: print("     [!] " + alerta)
+        if verbose: print_c("     [!] " + alerta)
     else: 
         alerta = "SYN Cookies está desactivado. El servidor dejará de aceptar conexiones si la cola se llena"
         resultados["alertas"].append(alerta)
         resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "PELIGRO", "desc": alerta}) 
-        if verbose: print("     [X] " + alerta)
+        if verbose: print_c("     [X] " + alerta)
 
     ########## rp_filter ################################################################################################################
     val_rpfilter = valores["net.ipv4.conf.all.rp_filter"]
@@ -199,18 +201,18 @@ def auditar_protecciones_dos(verbose):
         detalle = "Reverse Path Filter está activado en modo estricto"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print("     [V] " + detalle)
+        if verbose: print_c("     [V] " + detalle)
     elif val_rpfilter == "2":
         resultados["rp_filter"] = True
         alerta = "Reverse Path Filter está activado en modo perdida. Solo verifica si la IP es alcanzable"
         resultados["alertas"].append(alerta)
         resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "ADVERTENCIA", "desc": alerta}) 
-        if verbose: print("     [!] " + alerta)
+        if verbose: print_c("     [!] " + alerta)
     else: 
         alerta = "Reverse Path Filter está desactivado. El sistema no valida la ruta de origen"
         resultados["alertas"].append(alerta)
         resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "PELIGRO", "desc": alerta}) 
-        if verbose: print("     [X] " + alerta)
+        if verbose: print_c("     [X] " + alerta)
 
     ########## tcp_max_syn_backlog ########################################################################################################
     try:
@@ -220,12 +222,12 @@ def auditar_protecciones_dos(verbose):
             detalle = "El tamaño de la cola SYN es seguro ("+str(val_backlog)+" bytes)"
             resultados["detalles"].append(detalle)
             resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "OK", "desc": detalle}) 
-            if verbose: print("     [V] " + detalle)
+            if verbose: print_c("     [V] " + detalle)
         else:
             alerta = "El tamaño de la cola SYN es insuficiente ("+str(val_backlog)+" bytes)"
             resultados["alertas"].append(alerta)
             resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "PELIGRO", "desc": alerta}) 
-            if verbose: print("     [X] " + alerta)
+            if verbose: print_c("     [X] " + alerta)
     except ValueError:
         alerta = "El valor de tcp_max_syn_backlog no es numérico"
         resultados["alertas"].append(alerta)
@@ -238,12 +240,12 @@ def auditar_protecciones_dos(verbose):
         detalle = "Ignorar ICMP Broadcast está activado"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "icmp_echo_ignore_broadcasts", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print("     [V] " + detalle)
+        if verbose: print_c("     [V] " + detalle)
     else:
         alerta = "Ignorar ICMP Broadcast está desactivado. El sistema responderá a pings broadcast y podría usarse para amplificar ataques DDoS"
         resultados["alertas"].append(alerta)
         resultados["tabla_dos"].append({"param": "icmp_echo_ignore_broadcasts", "estado_color": "PELIGRO", "desc": alerta}) 
-        if verbose: print("     [X] " + alerta)
+        if verbose: print_c("     [X] " + alerta)
 
 
     ########## Evaluamos el estado global del módulo #####################################################################################
@@ -257,27 +259,27 @@ def auditar_protecciones_dos(verbose):
         alerta = 'La configuración del kernel en cuanto a ataques DoS presenta fallos críticos ('+str(fallos_criticos)+')'
         resultados["alertas"].append(alerta)
         if verbose:
-            print("     [X] "+str(alerta))
+            print_c("     [X] "+str(alerta))
         
     elif len(resultados["alertas"]) > 0:
         alerta = "Aunque el kerenl no presenta una configuración con fallos críticos, se recomienda revisar la configuración"
         resultados["alertas"].append(alerta)
         resultados["estado"] = "ADVERTENCIA"
         if verbose:
-            print("     [i] "+alerta)
+            print_c("     [i] "+alerta)
     
     else:
         resultados["estado"] = "SEGURO"
         detalle = "El sistema cuenta con protecciones bien configuradas contra DoS"
         resultados["detalles"].append(detalle)
         if verbose: 
-            print("     [V] "+detalle)
+            print_c("     [V] "+detalle)
         
     return resultados
 
 ###########################################################################################################################
 def auditar_limites_recursos(verbose):
-    print("[+] Auditando límites de recursos de usuario")
+    print_c("[+] Auditando límites de recursos de usuario")
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
@@ -327,12 +329,12 @@ def auditar_limites_recursos(verbose):
                                 estado_limites[item]["archivo"] = ruta
                                 detalle = "Límite global ("+str(item)+") detectado en "+str(ruta)+": "+str(valor)
                                 resultados["detalles"].append(str(detalle))
-                                if verbose: print("     [V] "+str(detalle))
+                                if verbose: print_c("     [V] "+str(detalle))
                                 
         except Exception as e:
             alerta = "No se puede leer el archivo "+str(ruta)+": "+str(e)
             resultados["alertas"].append(str(alerta))
-            if verbose: print("     [ERROR] "+str(alerta))
+            if verbose: print_c("     [ERROR] "+str(alerta))
 
     limites_faltantes = []
     limites_encontrados_contador = 0
@@ -357,6 +359,47 @@ def auditar_limites_recursos(verbose):
     if not limites_faltantes:
         resultados["estado"] = "SEGURO"
         if verbose: 
+            print_c("     [V] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
+            
+    elif limites_encontrados_contador > 0:
+        resultados["estado"] = "ADVERTENCIA"
+        alerta = "Protección parcial. Faltan límites para: " + ", ".join(limites_faltantes)
+        resultados["alertas"].append(alerta)
+        if verbose: 
+            print_c("     [!] "+str(alerta))
+            
+    else:
+        resultados["estado"] = "PELIGROSO"
+        alerta = "Riesgo crítico de denegación de servicio. No se detectó ningún límite."
+        resultados["alertas"].append(alerta)
+        if verbose: 
+            print_c("     [X] "+str(alerta))
+            
+    return resultados
+
+
+
+
+
+
+
+###########################################################################################################################
+def ESCANER_disponibilidad(verbose):
+    datos_reporte = {
+        "backups": {},
+        "protecciones_dos": {},
+        "limites_recursos": {}
+    }
+    
+    print("\n--- [ FASE 7: AUDITORÍA DE DISPONIBILIDAD ] ---")
+    print_c("[+] Iniciando módulo de disponibilidad")
+    
+    datos_reporte["backups"] = auditar_backups(verbose)
+    datos_reporte["protecciones_dos"] = auditar_protecciones_dos(verbose)
+    datos_reporte["limites_recursos"] = auditar_limites_recursos(verbose)
+    
+    print_c("[-] Finalizando módulo de disponibilidad")
+    return datos_reporte
             print("     [V] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
             
     elif limites_encontrados_contador > 0:

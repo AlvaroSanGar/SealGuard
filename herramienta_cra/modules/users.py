@@ -2,14 +2,16 @@ import os
 import datetime
 import modules.system as mSystem
 from config.settings import config
+from core.colores_terminal import print_c
+
 
 def info_usuarios_base(verbose, uid_min):
-    print("[+] Recopilando información base de usuarios")
+    print_c("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
     critical_groups = config["users"]["critical_groups"]
     if verbose:
-        print("     [i] Grupos marcados como críticos: "+str(critical_groups))
+        print_c("     [i] Grupos marcados como críticos: "+str(critical_groups))
     
     
     ################# Obtenemos los usuarios que pertenecen a grupos críticos ################################
@@ -23,9 +25,9 @@ def info_usuarios_base(verbose, uid_min):
     usu_grupos_criticos = mSystem.ejecutar_consulta(query)
    
     if verbose:
-        print("     [i] Usuarios detectados en grupos críticos: ")
+        print_c("     [i] Usuarios detectados en grupos críticos: ")
         for u in usu_grupos_criticos:
-            print("         - Usuario: "+str(u.get("username"))+" / Grupo: "+str(u.get("groupname")))
+            print_c("         - Usuario: "+str(u.get("username"))+" / Grupo: "+str(u.get("groupname")))
             
 
     #################### Obtenemos los usuarios relevantes (por uid, grupo o root) ########################
@@ -42,9 +44,9 @@ def info_usuarios_base(verbose, uid_min):
     usuarios = mSystem.ejecutar_consulta(query)
     
     if verbose:
-        print("\n     [i] Información extraída de los usuarios relevantes: ")
+        print_c("\n     [i] Información extraída de los usuarios relevantes: ")
         for u in usuarios:
-            print("         - Usuario: "+str(u.get("username"))+" / uid: "+str(u.get("uid"))+" / shell: "+str(u.get("shell")))
+            print_c("         - Usuario: "+str(u.get("username"))+" / uid: "+str(u.get("uid"))+" / shell: "+str(u.get("shell")))
     
     ##################### Obtenemos las políticas individuales ############################################
     
@@ -58,7 +60,7 @@ def info_usuarios_base(verbose, uid_min):
     datos_shadow = mSystem.ejecutar_consulta(query)
     
     if verbose:
-        print("\n     [i] Políticas de contraseñas extraídos del archivo shadow.")
+        print_c("\n     [i] Políticas de contraseñas extraídos del archivo shadow.")
 
     #################### Unificamos datos ##############################################################
     resultado = juntar_datos(usuarios, usu_grupos_criticos, datos_shadow)
@@ -132,7 +134,7 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 ##################################################################################################################################
 
 def politicas_passwords(verbose):
-    print("[+] Auditando políticas de contraseñas generales")
+    print_c("[+] Auditando políticas de contraseñas generales")
     politicas = config["users"]["politics"]
     politica_general = {}
     try:
@@ -150,13 +152,13 @@ def politicas_passwords(verbose):
                                 politica_general[clave] = partes[1]
     
     except PermissionError:
-        print(" [ERROR] Permisos insuficientes para leer /etc/login.defs")
+        print_c(" [ERROR] Permisos insuficientes para leer /etc/login.defs")
     
     except FileNotFoundError:
-        print(" [ERROR] No se ha encontrado el archivo /etc/login.defs")
+        print_c(" [ERROR] No se ha encontrado el archivo /etc/login.defs")
     
     except Exception as e:
-        print(" [ERROR] Se ha producido un fallo al tratar de leer /etc/login.defs: "+str(e))
+        print_c(" [ERROR] Se ha producido un fallo al tratar de leer /etc/login.defs: "+str(e))
         
     return politica_general
 
@@ -175,7 +177,7 @@ def politicas_passwords(verbose):
 
 
 def comp_2FA(verbose, usuarios):
-    print("[+] Buscando métodos de doble factor de autentificación")
+    print_c("[+] Buscando métodos de doble factor de autentificación")
     modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
     servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']
@@ -195,9 +197,9 @@ def comp_2FA(verbose, usuarios):
         if modulos_common:
             reporte_2fa["mfa_global"] = True
             if verbose:
-                print("     [i] Se han hallado los siguientes módulos en /etc/pam.d/common-auth:")
+                print_c("     [i] Se han hallado los siguientes módulos en /etc/pam.d/common-auth:")
                 for m in modulos_common:
-                    print("         - "+str(m))
+                    print_c("         - "+str(m))
     else:
         modulos_common = []
     
@@ -218,7 +220,7 @@ def comp_2FA(verbose, usuarios):
             reporte_2fa['servicios'][servicio]['protegido'] = True
             reporte_2fa['servicios'][servicio]['detalles'] = ["Servicio no detectado en el sistema"]
             if verbose:
-                print("     [i] El servicio '"+servicio+"' no está instalado en el sistema")
+                print_c("     [i] El servicio '"+servicio+"' no está instalado en el sistema")
         
     
     ################## Comprobamos si el servicio sshd tiene 2fa ###########################################################
@@ -229,21 +231,21 @@ def comp_2FA(verbose, usuarios):
         if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
             reporte_2fa["ssh_config_valido"] = True
             if verbose:
-                print("     [i] Configuración de SSH válida para aplicar MFA")
+                print_c("     [i] Configuración de SSH válida para aplicar MFA")
         elif verbose:
-            print("     [X] Configuración de SSH no válida para aplicar MFA")
+            print_c("     [X] Configuración de SSH no válida para aplicar MFA")
     
     else:
         reporte_2fa["ssh_instalado"] = False 
         reporte_2fa["ssh_config_valido"] = True # Mantenemos esto en true para que no reste puntos en el reporte
         if verbose:
-            print("     [i] El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA")
+            print_c("     [i] El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA")
     
     
 
     ################# Comprobamos la existencia de los tokens de autentificación en los dir de cada usu #####################
     if verbose:
-        print("     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
+        print_c("     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
     
     # Cargamos los módulos activos para después comprobar si los tokens pertenecen a uno de los servicios activos 
     # Lo hacemos en un set para evitar duplicados al recoger los servicios activos de 'detalles'
@@ -273,9 +275,9 @@ def comp_2FA(verbose, usuarios):
                     
                     if verbose:
                         if token_efectivo:
-                            print("         - [V] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
+                            print_c("         - [V] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
                         else:
-                            print("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
+                            print_c("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
                             
     return reporte_2fa
 
@@ -295,9 +297,9 @@ def comprobar(archivo, buscar):
                             resultado.append(clave)
                         
     except FileNotFoundError as e:
-        print(" [ERROR] El archivo "+str(archivo)+" no existe")
+        print_c(" [ERROR] El archivo "+str(archivo)+" no existe")
     except Exception as e:
-        print(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
+        print_c(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
     
     return list(set(resultado)) # Nos evitamos duplicados 
 
@@ -312,7 +314,7 @@ def ESCANER_usuarios(verbose):
     }
     
     print("\n--- [ FASE 4: AUDITORÍA DE USUARIOS ] ---")
-    print("[+] Iniciando módulo de escaneo de usuarios")
+    print_c("[+] Iniciando módulo de escaneo de usuarios")
     resultados["politicas"] = politicas_passwords(verbose)
     
     #Comprobamos si hay definido un min uid para los usuarios personas en las políticas, de lo contrario ponemos 1000
@@ -325,7 +327,5 @@ def ESCANER_usuarios(verbose):
     
     # Comprobamos si existe 2fa
     resultados["2FA"] = comp_2FA(verbose, resultados["usuarios"])
-    print("[-] Finalizando módulo de escaneo de usuarios")
+    print_c("[-] Finalizando módulo de escaneo de usuarios")
     return resultados
-
-    

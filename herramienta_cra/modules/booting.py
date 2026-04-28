@@ -1,11 +1,13 @@
 import os
 from modules.system import ejecutar_consulta
 from config.settings import config
+from core.colores_terminal import print_c
+
 
 ###########################################################################################################################
 
 def auditar_integridad_firmware(verbose):
-    print("[+] Auditando integridad del firmware y del kernel")
+    print_c("[+] Auditando integridad del firmware y del kernel")
     resultados = {
         "secure_boot": False,
         "kernel_seguro": False,
@@ -23,7 +25,7 @@ def auditar_integridad_firmware(verbose):
         black_list = config["boot"]["integridad_kernel"]["black_list"]
         
     except KeyError:
-        print("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
+        print_c("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
         white_list = [["P", 1, "Módulo propietario"], ["O", 4096, "Módulo externo"]]
         warning_list = [["W", 512, "Warning"], ["C", 1024, "Staging"], ["K", 32768, "Live patched"]]
         black_list = [["F", 2, "Forzado"], ["R", 8, "Forzado unload"], ["D", 128, "OOPS/BUG"], ["A", 256, "ACPI"], ["E", 8192, "No firmado"]]
@@ -43,7 +45,7 @@ def auditar_integridad_firmware(verbose):
             resultados["sb_estado"] = "SEGURO"
             resultados["sb_msg"] = detalle
             if verbose:
-                print("     [V] "+str(detalle))
+                print_c("     [V] "+str(detalle))
         
         elif resul_SB == 2:
             alerta = 'El sistema tiene activado Secure Boot con el modo Medium-Security, este modo no otorga una protección aceptable'
@@ -51,7 +53,7 @@ def auditar_integridad_firmware(verbose):
             resultados["sb_estado"] = "ADVERTENCIA"
             resultados["sb_msg"] = alerta
             if verbose:
-                print("     [X] "+str(alerta))
+                print_c("     [X] "+str(alerta))
         
         else:
             alerta = 'El sistema no tiene activado Secure Boot'
@@ -59,7 +61,7 @@ def auditar_integridad_firmware(verbose):
             resultados["sb_estado"] = "PELIGROSO"
             resultados["sb_msg"] = alerta
             if verbose:
-                print("     [X] "+str(alerta))
+                print_c("     [X] "+str(alerta))
     
     # La tabla no tiene registros por lo que está en modo Legacy
     else:
@@ -68,7 +70,7 @@ def auditar_integridad_firmware(verbose):
         resultados["sb_estado"] = "PELIGROSO"
         resultados["sb_msg"] = alerta
         if verbose:
-            print("     [X] "+str(alerta))
+            print_c("     [X] "+str(alerta))
 
     ######## Tainted kernel ##############################################################################
     query = 'SELECT current_value FROM system_controls WHERE name = "kernel.tainted";'
@@ -84,7 +86,7 @@ def auditar_integridad_firmware(verbose):
             detalle = 'El kernel no ha sido alterado en el proceso de boot'
             resultados["detalles"].append(detalle)
             if verbose:
-                print("     [V] "+detalle)
+                print_c("     [V] "+detalle)
             return resultados
         
         # Comprobamos las flags haciendo XOR ya que cada una es una potencia de dos
@@ -101,7 +103,7 @@ def auditar_integridad_firmware(verbose):
                         resultados["alertas"].append(str(alerta))
                         resultados["tainted_flags"].append({"flag": val[0], "desc": val_desc, "riesgo": "MEDIO"})
                         if verbose:
-                            print("     [!] "+str(alerta))
+                            print_c("     [!] "+str(alerta))
                     
                     elif val in black_list:
                         alerta = 'Se ha detectado la flag '+str(val[0])+' en el estado del kernel, la cual se considera un fallo crítico'
@@ -109,7 +111,7 @@ def auditar_integridad_firmware(verbose):
                         resultados["tainted_flags"].append({"flag": val[0], "desc": val_desc, "riesgo": "CRITICO"})
                         problemas_tai += 1
                         if verbose:
-                            print("     [X] "+str(alerta))
+                            print_c("     [X] "+str(alerta))
                     
                     else:
                         # Es o "P" o "O", es decir white_list
@@ -117,7 +119,7 @@ def auditar_integridad_firmware(verbose):
                         resultados["detalles"].append(str(detalle))
                         resultados["tainted_flags"].append({"flag": val[0], "desc": val_desc, "riesgo": "INFO"})
                         if verbose:
-                            print("     [V] "+str(detalle))
+                            print_c("     [V] "+str(detalle))
         
     # La consulta no de puede realizar
     else:
@@ -125,7 +127,7 @@ def auditar_integridad_firmware(verbose):
         resultados["alertas"].append(alerta)
         problemas_tai += 1
         if verbose:
-            print("     [ERROR] "+str(alerta))
+            print_c("     [ERROR] "+str(alerta))
         
     # Evaluamos el estado del kernel
     if problemas_tai == 0:
@@ -134,18 +136,18 @@ def auditar_integridad_firmware(verbose):
             detalle = 'Todas las flags del kernel se consideran seguras'
             resultados["detalles"].append(detalle)
             if verbose:
-                print("     [V] "+str(detalle))
+                print_c("     [V] "+str(detalle))
         else:
             alerta = 'Se han detectado '+str(warning_tai)+' flags de peligrosidad media, revise los módulos cargados'
             resultados["alertas"].append(alerta)
             if verbose:
-                print("     [!] "+str(alerta))
+                print_c("     [!] "+str(alerta))
 
     else:
         alerta = 'Se han detectado '+str(problemas_tai)+' flags consideradas como fallos críticos'
         resultados["alertas"].append(alerta)
         if verbose:
-            print("     [X] "+str(alerta))
+            print_c("     [X] "+str(alerta))
     return resultados
 
 
@@ -155,7 +157,7 @@ def auditar_integridad_firmware(verbose):
 
 ###########################################################################################################################
 def auditar_parametros_kernel(verbose):
-    print("[+] Verificando parámetros de seguridad en el arranque del Kernel")
+    print_c("[+] Verificando parámetros de seguridad en el arranque del Kernel")
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
@@ -170,7 +172,7 @@ def auditar_parametros_kernel(verbose):
         black_list = config["boot"]["param_kernel"]["black_list"]
     
     except KeyError:
-        print("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
+        print_c("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
         white_list = [["apparmor=1", "selinux=1", "enforcing=1"], "audit=1", "slab_nomerage=1", "page_poison=1"]
         black_list = [["init=/bin/bash", "init=single", "single"], "nokaslr", ["mitigations=off", "nopti"]]
     
@@ -199,7 +201,7 @@ def auditar_parametros_kernel(verbose):
                     grub_def = linea.split('=', 1)[1].strip(' "\'')
                 
     except Exception as e:
-        print("     [ERROR] Fallo al leer '/etc/default/grub': "+str(e))
+        print_c("     [ERROR] Fallo al leer '/etc/default/grub': "+str(e))
         resultados["alertas"].append("No se ha logrado leer el archivo /etc/default/grub")
         return resultados
     
@@ -228,7 +230,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["detalles"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": nombre_param, "estado": "OK", "desc": "Parámetro obligatorio configurado correctamente"})
                 if verbose:
-                    print("     [V] "+str(detalle))
+                    print_c("     [V] "+str(detalle))
                     
             # Caso de que aparezca en grub_default
             elif aparece_default:
@@ -237,7 +239,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["alertas"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": nombre_param, "estado": "ADVERTENCIA", "desc": "Configurado en DEFAULT (no persistente en rescate)"})
                 if verbose:
-                    print("     [!] "+str(detalle))
+                    print_c("     [!] "+str(detalle))
             
             # Caso de que no aparezca
             else:
@@ -245,7 +247,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["fallos"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": " / ".join(parametro), "estado": "FALTA", "desc": "Parámetro de seguridad obligatorio no encontrado"})
                 if verbose:
-                    print("     [X] "+str(detalle))
+                    print_c("     [X] "+str(detalle))
                     
         else: 
             if parametro in grub:
@@ -253,7 +255,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["detalles"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": parametro, "estado": "OK", "desc": "Parámetro obligatorio configurado correctamente"})
                 if verbose:
-                    print("     [V] "+str(detalle))
+                    print_c("     [V] "+str(detalle))
                     
             elif parametro in grub_def:
                 detalle = '''El parametro '''+str(parametro)+''' aparece en los parametros mandados al kernel por GRUB_CMDLINE_LINUX_DEFAULT y no por 
@@ -261,14 +263,14 @@ def auditar_parametros_kernel(verbose):
                 resultados["alertas"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": parametro, "estado": "ADVERTENCIA", "desc": "Configurado en DEFAULT (no persistente en rescate)"})
                 if verbose:
-                    print("     [!] "+str(detalle))
+                    print_c("     [!] "+str(detalle))
             
             else:
                 detalle = "El parámetro "+str(parametro)+" no se le pasa al kernel, esto supone un fallo de seguridad"
                 resultados["fallos"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": parametro, "estado": "FALTA", "desc": "Parámetro de seguridad obligatorio no encontrado"})
                 if verbose:
-                    print("     [X] "+str(detalle))
+                    print_c("     [X] "+str(detalle))
             
     ######## Comprobamos la black_list #####################################################################################
     
@@ -281,31 +283,31 @@ def auditar_parametros_kernel(verbose):
                     resultados["prohibido"].append(detalle)
                     resultados["parametros_tabla"].append({"param": opcion, "estado": "PROHIBIDO", "desc": "Parámetro inseguro detectado activo"})
                     if verbose:
-                        print("     [X] "+str(detalle))
+                        print_c("     [X] "+str(detalle))
             
         elif parametro in grub_tot:
             detalle = "Se ha encontrado el parámetro "+str(parametro)+" el cual está prohibido, esto supone un fallo de seguridad crítico"
             resultados["prohibido"].append(detalle)
             resultados["parametros_tabla"].append({"param": parametro, "estado": "PROHIBIDO", "desc": "Parámetro inseguro detectado activo"})
             if verbose:
-                print("     [X] "+str(detalle))
+                print_c("     [X] "+str(detalle))
                 
     ####### Calificamos resultados ################################################################################################
     
     if len(resultados["fallos"]) > 0 or len(resultados["prohibido"]) > 0:
         resultados["estado"] = "PELIGROSO"
         if verbose:
-            print("     [X] Los parametros del kernel son peligrosos y suponen un fallo crítico de seguridad")
+            print_c("     [X] Los parametros del kernel son peligrosos y suponen un fallo crítico de seguridad")
     
     elif len(resultados["alertas"]) > 0:
         resultados["estado"] = "ADVERTENCIA"
         if verbose:
-            print("     [!] Los parametros del kernel no lo protegen en caso de arranque de rescate")
+            print_c("     [!] Los parametros del kernel no lo protegen en caso de arranque de rescate")
         
     else:
         resultados["estado"] = "SEGURO"
         if verbose:
-            print("     [V] Los parametros del kernel se consideran seguros")
+            print_c("     [V] Los parametros del kernel se consideran seguros")
             
     return resultados
 
@@ -323,7 +325,7 @@ def auditar_parametros_kernel(verbose):
 ###########################################################################################################################
 
 def auditar_seguridad_grub(verbose, datos_grub):
-    print("[+] Comprobando la seguridad del gestor de arranque")
+    print_c("[+] Comprobando la seguridad del gestor de arranque")
     resultados = {
         "estado": "PELIGROSO",
         "protegido": False,
@@ -350,7 +352,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
         resultados["archivo_msg"] = alerta
         resultados["alertas"].append(str(alerta))
         if verbose:
-            print("     [X] "+str(alerta))
+            print_c("     [X] "+str(alerta))
         return resultados
         
     # Caso de que el dueño y los permisos sean correctos
@@ -361,7 +363,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
         resultados["archivo_msg"] = detalle
         resultados["detalles"].append(str(detalle))
         if verbose:
-            print("     [V] " + str(detalle))
+            print_c("     [V] " + str(detalle))
     
     # Caso de que no sean correctos
     else:
@@ -371,7 +373,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
         for p in problemas:
             resultados["alertas"].append(p)
             if verbose:
-                print("     [X] " + p)
+                print_c("     [X] " + p)
     
     
     ##### Comprobamos si el arranque requiere contraseña ###################################
@@ -389,7 +391,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
         resultados["pass_msg"] = alerta
         resultados["alertas"].append(alerta)
         if verbose: 
-            print("     [!] " + alerta)
+            print_c("     [!] " + alerta)
     
     # Si existe lo abrimos y buscamos si usa contraseña
     if path:
@@ -408,7 +410,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
                         resultados["pass_msg"] = detalle
                         resultados["detalles"].append(detalle)
                         if verbose: 
-                            print("     [V] " + detalle)
+                            print_c("     [V] " + detalle)
                         break
                 
                 if not resultados["protegido"]:
@@ -417,11 +419,11 @@ def auditar_seguridad_grub(verbose, datos_grub):
                     resultados["pass_msg"] = alerta
                     resultados["alertas"].append(alerta)
                     if verbose: 
-                        print("     [!] " + alerta)
+                        print_c("     [!] " + alerta)
                     
         except Exception as e:
             if verbose: 
-                print("     [ERROR] Fallo al leer '"+str(path)+"': "+str(e))
+                print_c("     [ERROR] Fallo al leer '"+str(path)+"': "+str(e))
 
 
     ######### Catalogamos el resultado final #####################################################
@@ -456,9 +458,9 @@ def ESCANER_booting(verbose, datos_grub):
     }
     
     print("\n--- [ FASE 6: AUDITORÍA DE ARRANQUE ] ---")
-    print("[+] Iniciando módulo de escaneo de arranque...")
+    print_c("[+] Iniciando módulo de escaneo de arranque...")
     resultados["integridad"] = auditar_integridad_firmware(verbose)
     resultados["parametros"] = auditar_parametros_kernel(verbose)
     resultados["grub"] = auditar_seguridad_grub(verbose,  datos_grub)    
-    print("[-] Finalizando módulo de escaneo de arranque")
+    print_c("[-] Finalizando módulo de escaneo de arranque")
     return resultados
