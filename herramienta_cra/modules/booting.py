@@ -1,12 +1,13 @@
 import os
 from modules.system import ejecutar_consulta
 from config.settings import config
-from core.colores_terminal import print_c
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 ###########################################################################################################################
 
 def auditar_integridad_firmware(verbose):
+    print("")
     print_c("[+] Auditando integridad del firmware y del kernel")
     resultados = {
         "secure_boot": False,
@@ -45,7 +46,7 @@ def auditar_integridad_firmware(verbose):
             resultados["sb_estado"] = "SEGURO"
             resultados["sb_msg"] = detalle
             if verbose:
-                print_c("     [V] "+str(detalle))
+                print_c("     [Ok] "+str(detalle))
         
         elif resul_SB == 2:
             alerta = 'El sistema tiene activado Secure Boot con el modo Medium-Security, este modo no otorga una protección aceptable'
@@ -86,7 +87,7 @@ def auditar_integridad_firmware(verbose):
             detalle = 'El kernel no ha sido alterado en el proceso de boot'
             resultados["detalles"].append(detalle)
             if verbose:
-                print_c("     [V] "+detalle)
+                print_c("     [Ok] "+detalle)
             return resultados
         
         # Comprobamos las flags haciendo XOR ya que cada una es una potencia de dos
@@ -119,7 +120,7 @@ def auditar_integridad_firmware(verbose):
                         resultados["detalles"].append(str(detalle))
                         resultados["tainted_flags"].append({"flag": val[0], "desc": val_desc, "riesgo": "INFO"})
                         if verbose:
-                            print_c("     [V] "+str(detalle))
+                            print_c("     [Ok] "+str(detalle))
         
     # La consulta no de puede realizar
     else:
@@ -136,7 +137,7 @@ def auditar_integridad_firmware(verbose):
             detalle = 'Todas las flags del kernel se consideran seguras'
             resultados["detalles"].append(detalle)
             if verbose:
-                print_c("     [V] "+str(detalle))
+                print_c("     [Ok] "+str(detalle))
         else:
             alerta = 'Se han detectado '+str(warning_tai)+' flags de peligrosidad media, revise los módulos cargados'
             resultados["alertas"].append(alerta)
@@ -157,6 +158,7 @@ def auditar_integridad_firmware(verbose):
 
 ###########################################################################################################################
 def auditar_parametros_kernel(verbose):
+    print("")
     print_c("[+] Verificando parámetros de seguridad en el arranque del Kernel")
     resultados = {
         "estado": "PELIGROSO",
@@ -230,7 +232,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["detalles"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": nombre_param, "estado": "OK", "desc": "Parámetro obligatorio configurado correctamente"})
                 if verbose:
-                    print_c("     [V] "+str(detalle))
+                    print_c("     [Ok] "+str(detalle))
                     
             # Caso de que aparezca en grub_default
             elif aparece_default:
@@ -255,7 +257,7 @@ def auditar_parametros_kernel(verbose):
                 resultados["detalles"].append(str(detalle))
                 resultados["parametros_tabla"].append({"param": parametro, "estado": "OK", "desc": "Parámetro obligatorio configurado correctamente"})
                 if verbose:
-                    print_c("     [V] "+str(detalle))
+                    print_c("     [Ok] "+str(detalle))
                     
             elif parametro in grub_def:
                 detalle = '''El parametro '''+str(parametro)+''' aparece en los parametros mandados al kernel por GRUB_CMDLINE_LINUX_DEFAULT y no por 
@@ -307,7 +309,7 @@ def auditar_parametros_kernel(verbose):
     else:
         resultados["estado"] = "SEGURO"
         if verbose:
-            print_c("     [V] Los parametros del kernel se consideran seguros")
+            print_c("     [Ok] Los parametros del kernel se consideran seguros")
             
     return resultados
 
@@ -325,6 +327,7 @@ def auditar_parametros_kernel(verbose):
 ###########################################################################################################################
 
 def auditar_seguridad_grub(verbose, datos_grub):
+    print("")
     print_c("[+] Comprobando la seguridad del gestor de arranque")
     resultados = {
         "estado": "PELIGROSO",
@@ -363,7 +366,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
         resultados["archivo_msg"] = detalle
         resultados["detalles"].append(str(detalle))
         if verbose:
-            print_c("     [V] " + str(detalle))
+            print_c("     [Ok] " + str(detalle))
     
     # Caso de que no sean correctos
     else:
@@ -410,7 +413,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
                         resultados["pass_msg"] = detalle
                         resultados["detalles"].append(detalle)
                         if verbose: 
-                            print_c("     [V] " + detalle)
+                            print_c("     [Ok] " + detalle)
                         break
                 
                 if not resultados["protegido"]:
@@ -457,10 +460,12 @@ def ESCANER_booting(verbose, datos_grub):
         "grub": {},
     }
     
-    print("\n--- [ FASE 6: AUDITORÍA DE ARRANQUE ] ---")
-    print_c("[+] Iniciando módulo de escaneo de arranque...")
+    mostrar_subtitulos("Booting")
+    print("")
+    print_c("[+] Iniciando módulo de escaneo de arranque")
     resultados["integridad"] = auditar_integridad_firmware(verbose)
     resultados["parametros"] = auditar_parametros_kernel(verbose)
-    resultados["grub"] = auditar_seguridad_grub(verbose,  datos_grub)    
+    resultados["grub"] = auditar_seguridad_grub(verbose,  datos_grub)
+    print("")    
     print_c("[-] Finalizando módulo de escaneo de arranque")
     return resultados

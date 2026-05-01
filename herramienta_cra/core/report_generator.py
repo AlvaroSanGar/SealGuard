@@ -3,6 +3,7 @@ import time
 import pwd
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML, CSS
+from core.colores_terminal import print_c
 
 def calcular_resumen_dinamico(datos):
     resumen = []
@@ -12,7 +13,7 @@ def calcular_resumen_dinamico(datos):
 
     # Exposición de Red
     puertos = datos.get("puertos", [])
-    # Usamos .upper() y .strip() para que no fallen las comparaciones por espacios o minúsculas
+    # [ROBUSTEZ] Usamos .upper() y .strip() para que no fallen las comparaciones por espacios o minúsculas
     puertos_peligrosos = [p for p in puertos if str(p.get("estado", "")).strip().upper() != "ACEPTADO"]
     
     if len(puertos_peligrosos) == 0:
@@ -165,7 +166,7 @@ def generar_informe(fecha, datos):
             # Cambiamos el dueño (uid) y el grupo (gid) del archivo PDF recién creado
             os.chown(ruta_pdf, user_info.pw_uid, user_info.pw_gid)
 
-        print(f"[V] Reporte generado en: {ruta_pdf}\n")
+        print_c(f"[Ok] Reporte generado en: {ruta_pdf}\n")
 
     except Exception as e:
-        print(f"[ERROR] Fallo crítico al generar el informe: {e}")
+        print_c(f"[ERROR] Fallo crítico al generar el informe: {e}")

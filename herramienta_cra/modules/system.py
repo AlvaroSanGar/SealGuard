@@ -107,6 +107,7 @@ def ESCANEO_info_Simple(verbose):
     # Info del sistema
     info = info_sis() # Es un diccionario 
     if verbose:
+        print("")
         print_c("[+] Información del sistema: ")
         print_c("     [i] Hostname:      "+info['hostname'])
         print_c("     [i] Sistema:       "+info['dist']+" "+info['version'])

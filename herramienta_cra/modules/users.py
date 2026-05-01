@@ -2,10 +2,11 @@ import os
 import datetime
 import modules.system as mSystem
 from config.settings import config
-from core.colores_terminal import print_c
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 def info_usuarios_base(verbose, uid_min):
+    print("")
     print_c("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
@@ -134,6 +135,7 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 ##################################################################################################################################
 
 def politicas_passwords(verbose):
+    print("")
     print_c("[+] Auditando políticas de contraseñas generales")
     politicas = config["users"]["politics"]
     politica_general = {}
@@ -177,6 +179,7 @@ def politicas_passwords(verbose):
 
 
 def comp_2FA(verbose, usuarios):
+    print("")
     print_c("[+] Buscando métodos de doble factor de autentificación")
     modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
     servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
@@ -275,7 +278,7 @@ def comp_2FA(verbose, usuarios):
                     
                     if verbose:
                         if token_efectivo:
-                            print_c("         - [V] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
+                            print_c("         - [Ok] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
                         else:
                             print_c("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
                             
@@ -313,7 +316,8 @@ def ESCANER_usuarios(verbose):
         "2FA": {}
     }
     
-    print("\n--- [ FASE 4: AUDITORÍA DE USUARIOS ] ---")
+    mostrar_subtitulos("Usuarios")
+    print("")
     print_c("[+] Iniciando módulo de escaneo de usuarios")
     resultados["politicas"] = politicas_passwords(verbose)
     
@@ -327,5 +331,9 @@ def ESCANER_usuarios(verbose):
     
     # Comprobamos si existe 2fa
     resultados["2FA"] = comp_2FA(verbose, resultados["usuarios"])
+    print("")
     print_c("[-] Finalizando módulo de escaneo de usuarios")
     return resultados
+
+
+    

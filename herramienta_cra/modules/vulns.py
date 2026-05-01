@@ -1,9 +1,9 @@
 import requests
 import modules.system as mSystem
-import json
 import time
+import json
 from config.settings import config
-from core.colores_terminal import print_c
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 
@@ -138,7 +138,8 @@ def ESCANER_vulnerabilidades(verbose):
         "vulns": []
     }
 
-    print("\n--- [ FASE 2: AUDITORÍA DE VULNERABILIDADES ] ---")
+    mostrar_subtitulos("Vulnerabilidades")
+    print("")
     print_c("[+] Iniciando listado de paquetes instalados")
     
     # Obtenemos ambos tipos de paquetes
@@ -155,17 +156,8 @@ def ESCANER_vulnerabilidades(verbose):
     print_c("     [i] Paquetes de Sistema (APT): " + str(len(paquetes_apt)))
     print_c("     [i] Paquetes de Python  (PIP): " + str(len(paquetes_pip)))
     print_c("     [i] TOTAL paquetes detectados: " + str(len(paquetes_totales)))
-    
-    # Ejemplo de top 3 paquetes encontrados
-    if (len(paquetes_totales) > 0) and verbose:
-        ejemplos = []
-        for p in paquetes_totales[:3]:
-            ejemplos.append(p['name'] + " " + p['version'])     
-        print_c("   [i] Ejemplos: " + ", ".join(ejemplos) + "...")
-    elif verbose:
-        print_c("    [i] No se detectaron paquetes")
-
-    print_c("[-] Finalizando listado de paquetes")
+    print("")
+    print_c("[-] Finalizando listado de paquetes\n")
 
     ####################################################################################################################
     
@@ -175,6 +167,7 @@ def ESCANER_vulnerabilidades(verbose):
         vulns = escanear_vulnerabilidades(paquetes_totales)
         datos_reporte["vulns"] = vulns
         
+        print("")
         print_c("[+] Análisis completado.")
         print_c("   [i] Paquetes vulnerables detectados: " + str(len(vulns)))
         
@@ -189,6 +182,8 @@ def ESCANER_vulnerabilidades(verbose):
                 print_c("     [!] [" + v['tipo'] + "] " + v['paquete'] + " v" + v['version'] + " -> " + str(v['cantidad']) + " Vulns (" + primer_cve + " [CVSS: " + str(primer_score) + "]...)")
     else:
         print_c("[!] No hay paquetes para analizar (Fase 2 vacía).")
+    
+    print("")
     print_c("[-] Finalizando módulo de detección de vulnerabilidades")
 
     return datos_reporte

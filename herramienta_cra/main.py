@@ -1,12 +1,10 @@
 from core.auditor import seleccionar
+from core.colores_terminal import mostrar_banner
 
 if __name__ == "__main__":
-    print("\n==================================================")
-    print("      AUDITORÍA DE CUMPLIMIENTO CRA (LINUX)      ")
-    print("==================================================\n")
+    mostrar_banner()  
     
-    
-    mode = "scan"
+    mode = "reset"
     verbose = True
     seleccionar(mode, verbose)
 

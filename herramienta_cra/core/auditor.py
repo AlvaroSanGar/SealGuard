@@ -8,7 +8,8 @@ from modules.booting import ESCANER_booting
 from modules.availability import ESCANER_disponibilidad
 import core.operadorBBDD as opBBDD
 from core.report_generator import generar_informe
-from datetime import datetime 
+from datetime import datetime
+from core.colores_terminal import print_c, print_input, print_table
 
 
 
@@ -32,7 +33,7 @@ def seleccionar(mode, verbose):
                     id_baseline = int(id_str)
                     opBBDD.seleccionar_baseline(id_baseline)
                 except ValueError:
-                    print("[ERROR] Debes introducir ID válido.")
+                    print_c("[ERROR] Debes introducir ID válido.")
         
         case "recover":
             opBBDD.mostrar_tabla("reportes")
@@ -42,23 +43,22 @@ def seleccionar(mode, verbose):
                     id_reporte = int(id_str)
                     reporte = opBBDD.obtener_elemento(id_reporte, "reportes")
                     if reporte:
-                        print("[+] Reporte "+str(id_reporte)+" recuperado, generando PDF")
+                        print_c("[+] Reporte "+str(id_reporte)+" recuperado, generando PDF")
                         generar_informe(reporte["fecha"], reporte["datos"]) 
                     else:
                         # Si devuelve None es porque no existe
-                        print("[ERROR] No existe ningún reporte con el ID "+str(id_reporte))
+                        print_c("[ERROR] No existe ningún reporte con el ID "+str(id_reporte))
                 except ValueError:
-                    print("[ERROR] Introduzca un ID válido")
+                    print_c("[ERROR] Introduzca un ID válido")
             
         case "history":
             opBBDD.mostrar_tabla("baseline")
             opBBDD.mostrar_tabla("reportes") 
             
         case "delete":
-            opBBDD.borrar_BBDD()       
+            opBBDD.borrar_BBDD()     
+              
         
-    print("\n\n--- [ FIN DEL ESCANEO ] ---\n")
-
 
 
 
@@ -124,5 +124,5 @@ def escaneo_normal(verbose):
     opBBDD.insertar_elemento(datos_reporte, "reportes", fecha_actual)
     
     # Generamos el PDF
-    print("\n[+] Escaneo finalizado correctamente, generando PDF")
+    print_c("[Ok] Escaneo finalizado correctamente, generando PDF")
     generar_informe(fecha_actual, datos_reporte)

@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 from config.settings import config
-from core.colores_terminal import print_c
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 def calcular_integridad(ruta):
@@ -39,6 +39,7 @@ def calcular_integridad(ruta):
 
 
 def generar_baseline():
+    print("")
     print_c("[+] Iniciando recopilación de hashes críticos")
     # Cargamos los archivos de settings
     archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
@@ -67,6 +68,7 @@ def generar_baseline():
     try:
         with open('history/escaneo_baseline.json', 'w') as f:
             json.dump(baseline, f)
+        print("")
         print_c("[-] El archivo baseline se ha generado con éxito\n")
         return baseline
     
@@ -83,6 +85,7 @@ def verificar_integridad(verbose):
     if not (os.path.exists('history/escaneo_baseline.json')):
         print_c("[!] No se puede realizar el escaneo de integridad ya que el archivo 'history/escaneo_baseline.json' no existe")
         return None
+    print("")
     print_c("[+] Iniciando módulo de integridad")
     
     # Cargamos los archivos de settings
@@ -123,7 +126,8 @@ def verificar_integridad(verbose):
     resultados = []
     
     # Comparamos los resultados obtenidos con los guardados
-    print_c("\n   [+] Comenzado la comparación entre resultados obtenidos y los almacenados")
+    print("")
+    print_c("[+] Comenzado la comparación entre resultados obtenidos y los almacenados")
     for archi, resul in guardados.items():
         detalles_cambio = []
         if archi not in comp:
@@ -134,7 +138,7 @@ def verificar_integridad(verbose):
         elif resul == comp[archi]:
             estado = "INTACTO"
             if verbose:
-                print_c("     [V] " + archi + " -> " + estado)
+                print_c("     [Ok] " + archi + " -> " + estado)
         
         else:
             estado = "MODIFICADO"
@@ -167,7 +171,8 @@ def verificar_integridad(verbose):
             })
             if verbose:
                 print_c("     [!] El archivo '"+ruta_actual+"' no está en el listado del escaneo baseline")
-            
+    
+    print("")
     print_c("[-] Finalizando módulo de integridad")
     return resultados
 
@@ -175,6 +180,6 @@ def verificar_integridad(verbose):
 
 
 def ESCANEO_integridad(verbose):
-    print("\n--- [ FASE 3: AUDITORÍA DE INTEGRIDAD ] ---")
+    mostrar_subtitulos("Integridad")
     resultado = verificar_integridad(verbose)
     return resultado

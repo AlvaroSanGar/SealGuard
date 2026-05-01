@@ -32,15 +32,15 @@
         <h1 style="color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Índice de Contenidos</h1>
         <ul class="toc-list">
             <li class="toc-main"><a href="#resumen">Resumen Ejecutivo de Cumplimiento</a></li>
-            <li class="toc-main"><a href="#anexo-1">Sección I: Red y Vulnerabilidades</a></li>
+            <li class="toc-main"><a href="#anexo-1">Anexo I: Red y Vulnerabilidades</a></li>
             <li class="toc-sub"><a href="#anexo-1">1. Exposición de Servicios (Networking)</a></li>
             <li class="toc-sub"><a href="#anexo-1">2. Gestión de Vulnerabilidades (CVEs)</a></li>
 
-            <li class="toc-main"><a href="#anexo-2">Sección II: Identidad y Accesos</a></li>
+            <li class="toc-main"><a href="#anexo-2">Anexo II: Identidad y Accesos</a></li>
             <li class="toc-sub"><a href="#anexo-2">3. Políticas generales de usuarios</a></li>
             <li class="toc-sub"><a href="#anexo-2">4. Auditoría de Usuarios Relevantes</a></li>
 
-            <li class="toc-main"><a href="#anexo-3">Sección III: Hardening del Sistema</a></li>
+            <li class="toc-main"><a href="#anexo-3">Anexo III: Hardening del Sistema</a></li>
             <li class="toc-sub"><a href="#anexo-3">5. Control de Acceso y Memoria</a></li>
             <li class="toc-sub"><a href="#anexo-3">6. Seguridad del Servicio SSH</a></li>
             <li class="toc-sub"><a href="#anexo-3">7. Firewall</a></li>
@@ -49,11 +49,11 @@
             <li class="toc-sub"><a href="#anexo-3">10. Permisos de Archivos Críticos</a></li>
             <li class="toc-sub"><a href="#anexo-3">17. Auditoría de Certificados (PKI)</a></li>
 
-            <li class="toc-main"><a href="#anexo-4">Sección IV: Integridad y Arranque</a></li>
+            <li class="toc-main"><a href="#anexo-4">Anexo IV: Integridad y Arranque</a></li>
             <li class="toc-sub"><a href="#anexo-4">11. Monitorización de Integridad</a></li>
             <li class="toc-sub"><a href="#anexo-4">12. Seguridad de Arranque y Firmware</a></li>
 
-            <li class="toc-main"><a href="#anexo-5">Sección V: Disponibilidad y Continuidad</a></li>
+            <li class="toc-main"><a href="#anexo-5">Anexo V: Disponibilidad y Continuidad</a></li>
             <li class="toc-sub"><a href="#anexo-5">13. Protecciones contra DDoS</a></li>
             <li class="toc-sub"><a href="#anexo-5">14. Mecanismos de Backup y Recuperación</a></li>
         </ul>
@@ -91,7 +91,7 @@
                     </svg>
                     <div class="donut-center-text">
                         <span class="donut-number">{{ datos.estadisticas.total }}</span>
-                        <br><span class="donut-label">Módulos</span>
+                        <br><span class="donut-label">Controles</span>
                     </div>
                 </div>
                 <div class="chart-legend-container">
@@ -137,9 +137,9 @@
 
 
     <!--        Anexo 1         -->
-    <h1 id="anexo-1" class="section-title">Sección I: Red y Vulnerabilidades</h1>
+    <h1 id="anexo-1" class="section-title">Anexo I: Red y Vulnerabilidades</h1>
     
-    <h2 class="subsection-title">1. Exposición de Servicios (Networking)</h2>
+    <h2 class="subsection-title">1. Exposición de Servicios</h2>
 
     {% if datos.puertos | length > 0 %}
         {% for grupo in datos.puertos | groupby('ip') %}
@@ -158,40 +158,31 @@
                 </tr>
                 
                 {% for puerto in grupo.list %}
-                    {# [NUEVO] Comprobamos si es nuestro puerto ficticio #}
-                    {% if puerto.puerto == '-' %}
-                    <tr>
-                        <td colspan="5" class="text-center" style="padding: 15px; color: #000000; background-color: #f9fafb;">
-                            <strong>Interfaz sin exposición:</strong> No se ha detectado ningún puerto abierto en esta dirección IP.
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
-                        <td>{{ puerto.detalle }}</td>
-                        
-                        <td>
-                            <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
-                                {{ puerto.estado }}
-                            </span>
-                        </td>
-                        
-                        <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
-                        
-                        <td>
-                            <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
-                                {{ puerto.peligro }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endif %}
+                <tr>
+                    <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
+                    <td>{{ puerto.detalle }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.estado }}
+                        </span>
+                    </td>
+                    
+                    <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.peligro }}
+                        </span>
+                    </td>
+                </tr>
                 {% endfor %}
             </table>
             
         {% endfor %}
     {% else %}
         <div class="success-box">
-            <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
+            <strong>[✓] Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
         </div>
     {% endif %}
 
@@ -255,7 +246,7 @@
 
 
     <!--        Anexo 2         -->
-    <h1 id="anexo-2" class="section-title">Sección II: Identidad y Accesos</h1>
+    <h1 id="anexo-2" class="section-title">Anexo II: Identidad y Accesos</h1>
     <h2 class="subsection-title">3. Políticas generales de usuarios</h2>
     
     <table class="data-table">
@@ -382,12 +373,20 @@
         </tbody>
     </table>
 
-    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Requisitos de Infraestructura SSH</h3>
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Requisitos de Infraestructura SSH</h3>
     
-    {% if not datos['2FA'].ssh_instalado %}
+    {# Obtenemos la info de sshd de forma segura con .get() #}
+    {% set info_sshd = datos['2FA'].servicios.get('sshd') %}
+    
+    {# 1º Comprobamos si directamente el servicio no existe #}
+    {% if info_sshd and "Servicio no detectado en el sistema" in info_sshd.detalles %}
         <div class="info-box"><strong>Configuración SSH:</strong> El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA.</div>
+        
+    {# 2º Si existe, evaluamos si la configuración es válida #}
     {% elif datos['2FA'].ssh_config_valido %}
         <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
+        
+    {# 3º Si existe pero está mal configurado #}
     {% else %}
         <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
     {% endif %}
@@ -440,8 +439,9 @@
 
 
 
+
     <!--        Anexo 3         -->
-    <h1 id="anexo-3" class="section-title">Sección III: Hardening del Sistema</h1>
+    <h1 id="anexo-3" class="section-title">Anexo III: Hardening del Sistema</h1>
 
     <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
     <table class="data-table text-xs table-fixed">
@@ -525,7 +525,7 @@
     <h2 class="subsection-title">7. Auditoría de Certificados y Claves</h2>
     
     {% if datos.hardening.certificados.estado == 'SEGURO' and not datos.hardening.certificados.tabla_certificados %}
-        <div class="info-box"><strong>Rutas no definidas:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
+        <div class="info-box"><strong>Infraestructura PKI:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
     {% else %}
         <table class="data-table text-xs table-fixed">
             <thead>
@@ -836,7 +836,7 @@
 
 
     <!--        ANEXO 4         -->
-    <h1 id="anexo-4" class="section-title">Sección IV: Integridad y Arranque</h1>
+    <h1 id="anexo-4" class="section-title">Anexo IV: Integridad y Arranque</h1>
 
     <h2 class="subsection-title">13. Monitorización de Integridad</h2>
     <table class="data-table text-xs table-fixed">
@@ -992,7 +992,7 @@
 
 
     <!--        Anexo 5         -->
-    <h1 id="anexo-5" class="section-title">Sección V: Disponibilidad y Continuidad</h1>
+    <h1 id="anexo-5" class="section-title">Anexo V: Disponibilidad y Continuidad</h1>
 
     <h2 class="subsection-title">15. Protecciones contra DDoS</h2>
     

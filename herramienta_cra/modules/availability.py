@@ -1,7 +1,7 @@
 import os
 from modules.system import ejecutar_consulta
 from config.settings import config
-from core.colores_terminal import print_c
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 
@@ -10,6 +10,7 @@ from core.colores_terminal import print_c
 
 ###########################################################################################################################
 def auditar_backups(verbose):
+    print("")
     print_c("[+] Auditando políticas de copias de seguridad")
     resultados = {
         "backups_activos": False,
@@ -91,7 +92,7 @@ def auditar_backups(verbose):
                         "nombre": nombre_uni, "tipo": "Systemd Timer", "estado": estado_uni.upper(), "estado_color": "OK", "ruta": descrip_uni
                     })
                     
-                    if verbose: print_c("     [V] "+str(detalle))
+                    if verbose: print_c("     [Ok] "+str(detalle))
                 
                 else:
                     alerta = 'Se ha detectado la unidad de backup en estado '+str(estado_uni)+': '+str(nombre_uni)+' | '+str(descrip_uni)
@@ -139,6 +140,7 @@ def auditar_backups(verbose):
 
 ##########################################################################################################################
 def auditar_protecciones_dos(verbose):
+    print("")
     print_c("[+] Auditando protecciones del kernel contra Denegación de Servicio")
     resultados = {
         "estado": "PELIGROSO",
@@ -181,7 +183,7 @@ def auditar_protecciones_dos(verbose):
         detalle = "SYN Cookies está activado con normalidad. El kernel enviará cookies solo cuando la cola esté llena"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "tcp_syncookies", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print_c("     [V] " + detalle)
+        if verbose: print_c("     [Ok] " + detalle)
     elif val_syncookies == "2":
         resultados["tcp_syncookies"] = True 
         alerta = "SYN Cookies está activado en modo forzado. Aunque da protección, no se recomienda ya que aumenta la carga de CPU"
@@ -201,7 +203,7 @@ def auditar_protecciones_dos(verbose):
         detalle = "Reverse Path Filter está activado en modo estricto"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "rp_filter", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print_c("     [V] " + detalle)
+        if verbose: print_c("     [Ok] " + detalle)
     elif val_rpfilter == "2":
         resultados["rp_filter"] = True
         alerta = "Reverse Path Filter está activado en modo perdida. Solo verifica si la IP es alcanzable"
@@ -222,7 +224,7 @@ def auditar_protecciones_dos(verbose):
             detalle = "El tamaño de la cola SYN es seguro ("+str(val_backlog)+" bytes)"
             resultados["detalles"].append(detalle)
             resultados["tabla_dos"].append({"param": "tcp_max_syn_backlog", "estado_color": "OK", "desc": detalle}) 
-            if verbose: print_c("     [V] " + detalle)
+            if verbose: print_c("     [Ok] " + detalle)
         else:
             alerta = "El tamaño de la cola SYN es insuficiente ("+str(val_backlog)+" bytes)"
             resultados["alertas"].append(alerta)
@@ -240,7 +242,7 @@ def auditar_protecciones_dos(verbose):
         detalle = "Ignorar ICMP Broadcast está activado"
         resultados["detalles"].append(detalle)
         resultados["tabla_dos"].append({"param": "icmp_echo_ignore_broadcasts", "estado_color": "OK", "desc": detalle}) 
-        if verbose: print_c("     [V] " + detalle)
+        if verbose: print_c("     [Ok] " + detalle)
     else:
         alerta = "Ignorar ICMP Broadcast está desactivado. El sistema responderá a pings broadcast y podría usarse para amplificar ataques DDoS"
         resultados["alertas"].append(alerta)
@@ -273,12 +275,13 @@ def auditar_protecciones_dos(verbose):
         detalle = "El sistema cuenta con protecciones bien configuradas contra DoS"
         resultados["detalles"].append(detalle)
         if verbose: 
-            print_c("     [V] "+detalle)
+            print_c("     [Ok] "+detalle)
         
     return resultados
 
 ###########################################################################################################################
 def auditar_limites_recursos(verbose):
+    print("")
     print_c("[+] Auditando límites de recursos de usuario")
     resultados = {
         "estado": "PELIGROSO",
@@ -329,7 +332,7 @@ def auditar_limites_recursos(verbose):
                                 estado_limites[item]["archivo"] = ruta
                                 detalle = "Límite global ("+str(item)+") detectado en "+str(ruta)+": "+str(valor)
                                 resultados["detalles"].append(str(detalle))
-                                if verbose: print_c("     [V] "+str(detalle))
+                                if verbose: print_c("     [Ok] "+str(detalle))
                                 
         except Exception as e:
             alerta = "No se puede leer el archivo "+str(ruta)+": "+str(e)
@@ -359,7 +362,7 @@ def auditar_limites_recursos(verbose):
     if not limites_faltantes:
         resultados["estado"] = "SEGURO"
         if verbose: 
-            print_c("     [V] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
+            print_c("     [Ok] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
             
     elif limites_encontrados_contador > 0:
         resultados["estado"] = "ADVERTENCIA"
@@ -383,6 +386,7 @@ def auditar_limites_recursos(verbose):
 
 
 
+
 ###########################################################################################################################
 def ESCANER_disponibilidad(verbose):
     datos_reporte = {
@@ -390,54 +394,15 @@ def ESCANER_disponibilidad(verbose):
         "protecciones_dos": {},
         "limites_recursos": {}
     }
-    
-    print("\n--- [ FASE 7: AUDITORÍA DE DISPONIBILIDAD ] ---")
+
+    mostrar_subtitulos("Disponibilidad")    
+    print("")
     print_c("[+] Iniciando módulo de disponibilidad")
     
     datos_reporte["backups"] = auditar_backups(verbose)
     datos_reporte["protecciones_dos"] = auditar_protecciones_dos(verbose)
     datos_reporte["limites_recursos"] = auditar_limites_recursos(verbose)
     
+    print("")
     print_c("[-] Finalizando módulo de disponibilidad")
-    return datos_reporte
-            print("     [V] El sistema se encuentra protegido frente a Fork Bombs, Agotamiento de FDs y volcados masivos")
-            
-    elif limites_encontrados_contador > 0:
-        resultados["estado"] = "ADVERTENCIA"
-        alerta = "Protección parcial. Faltan límites para: " + ", ".join(limites_faltantes)
-        resultados["alertas"].append(alerta)
-        if verbose: 
-            print("     [!] "+str(alerta))
-            
-    else:
-        resultados["estado"] = "PELIGROSO"
-        alerta = "Riesgo crítico de denegación de servicio. No se detectó ningún límite."
-        resultados["alertas"].append(alerta)
-        if verbose: 
-            print("     [X] "+str(alerta))
-            
-    return resultados
-
-
-
-
-
-
-
-###########################################################################################################################
-def ESCANER_disponibilidad(verbose):
-    datos_reporte = {
-        "backups": {},
-        "protecciones_dos": {},
-        "limites_recursos": {}
-    }
-    
-    print("\n--- [ FASE 7: AUDITORÍA DE DISPONIBILIDAD ] ---")
-    print("[+] Iniciando módulo de disponibilidad")
-    
-    datos_reporte["backups"] = auditar_backups(verbose)
-    datos_reporte["protecciones_dos"] = auditar_protecciones_dos(verbose)
-    datos_reporte["limites_recursos"] = auditar_limites_recursos(verbose)
-    
-    print("[-] Finalizando módulo de disponibilidad")
     return datos_reporte
