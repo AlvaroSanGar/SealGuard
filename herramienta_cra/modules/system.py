@@ -2,6 +2,8 @@ import subprocess   # Ejecutar comandos por consola
 import json
 import platform     # Sacar info del sistema
 from collections import defaultdict
+from core.colores_terminal import print_c
+
 
 # Esta función sirve para realizar una consulta con OSqueryi, devolvemos una lista de diccionarios,
 # así es mucho más fácil a la hora de recibir los datos, ponemos todos los parametros para que se capture el texto en vez
@@ -17,11 +19,11 @@ def ejecutar_consulta(query):
         return json.loads(resultado.stdout)
     
     except FileNotFoundError:
-        print("[ERROR] No se ha encontrado osqueryi")
+        print_c("[ERROR] No se ha encontrado osqueryi")
         return []
         
     except Exception as e:
-        print("[ERROR] Fallo al ejecutar consulta Osquery: "+str(e))
+        print_c("[ERROR] Fallo al ejecutar consulta Osquery: "+str(e))
         return []
     
     
@@ -37,7 +39,7 @@ def obtener_interfaces():
             check=True
         )
     except Exception as e:
-        print("[ERROR] Fallo al listar las interfaces del sistema: "+str(e)+"\n")
+        print_c("[ERROR] Fallo al listar las interfaces del sistema: "+str(e)+"\n")
         return {}
 
     interfaces = defaultdict(list)
@@ -77,15 +79,49 @@ def info_sis():
     return info
 
 
-# Paquetes instalados con APT
+# NUEVA FUNCIÓN: Detección de familia de Sistema Operativo para compatibilidad
+def obtener_familia_os():
+    data = ejecutar_consulta("SELECT platform, name FROM os_version;")
+    if data and len(data) > 0:
+        plataforma = data[0].get("platform", "").lower()
+        nombre = data[0].get("name", "").lower()
+        
+        # Familia Debian (Ubuntu, Mint, PopOS...)
+        if "ubuntu" in plataforma or "debian" in nombre or "debian" in plataforma:
+            return "debian"
+        
+        # Familia RedHat (Fedora, CentOS, RHEL, AlmaLinux...)
+        elif "centos" in plataforma or "fedora" in nombre or "redhat" in nombre or "rhel" in nombre or "almalinux" in nombre:
+            return "redhat"
+            
+    return "desconocido"
+
+
+# Paquetes instalados con adaptación de familia OS
 def paquetes_instalados():
-    query = "SELECT name, version FROM deb_packages;"
-    resultado = ejecutar_consulta(query)
-    for p in resultado:
-        # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
-        p['ecosystem'] = 'Debian'
-        p['type'] = 'System (APT)'
-    return resultado
+    familia = obtener_familia_os()
+    
+    if familia == "debian":
+        query = "SELECT name, version FROM deb_packages;"
+        resultado = ejecutar_consulta(query)
+        for p in resultado:
+            # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
+            p['ecosystem'] = 'Debian'
+            p['type'] = 'System (APT)'
+        return resultado
+        
+    elif familia == "redhat":
+        # En Fedora/RedHat buscamos paquetes RPM
+        query = "SELECT name, version FROM rpm_packages;"
+        resultado = ejecutar_consulta(query)
+        for p in resultado:
+            # Usamos AlmaLinux como ecosistema compatible para la API de OSV.dev
+            p['ecosystem'] = 'AlmaLinux' 
+            p['type'] = 'System (RPM)'
+        return resultado
+        
+    else:
+        return []
 
 # Paquetes de Python con pip
 def paquetes_python():
@@ -105,9 +141,10 @@ def ESCANEO_info_Simple(verbose):
     # Info del sistema
     info = info_sis() # Es un diccionario 
     if verbose:
-        print("[+] Información del sistema: ")
-        print("     [i] Hostname:      "+info['hostname'])
-        print("     [i] Sistema:       "+info['dist']+" "+info['version'])
-        print("     [i] Kernel:        "+info['kernel'])
-        print("     [i] Arquitectura:  "+info['arquitectura']+"\n")
+        print("")
+        print_c("[+] Información del sistema: ")
+        print_c("     [i] Hostname:      "+info['hostname'])
+        print_c("     [i] Sistema:       "+info['dist']+" "+info['version'])
+        print_c("     [i] Kernel:        "+info['kernel'])
+        print_c("     [i] Arquitectura:  "+info['arquitectura']+"\n")
     return info

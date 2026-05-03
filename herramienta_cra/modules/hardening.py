@@ -6,10 +6,12 @@ import subprocess
 import re
 from modules.system import ejecutar_consulta
 from config.settings import config
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 
 def auditar_suid_sgid(verbose):
-    print("[+] Buscando binarios peligrosos (SUID/SGID)")
+    print("")
+    print_c("[+] Buscando binarios peligrosos (SUID/SGID)")
     resultados = {
         "seguros": 0,
         "peligrosos": []
@@ -31,11 +33,15 @@ def auditar_suid_sgid(verbose):
         
         # Miramos los permisos otros [-1] y de grupo [-2]
         if permisos and len(permisos) >= 3 and (permisos[-1] in critical_per or permisos[-2] in critical_per) or vulnerable_dir:
+            
+            motivo = "Ubicación en directorio crítico" if vulnerable_dir else "Permisos excesivos (Otros/Grupo: "+str(permisos[-2:])+")"
+            proceso["motivo"] = motivo
+            
             resultados["peligrosos"].append(proceso)
             if verbose and vulnerable_dir:
-                print("     [X] Se ha detectado un proceso con el bit SUID/GUID activo en: "+str(proceso["path"]))
+                print_c("     [X] Se ha detectado un proceso con el bit SUID/GUID activo en: "+str(proceso["path"]))
             elif verbose:
-              print("     [X] Se ha detectado un proceso con el bit SUID/GUID activo y permisos peligrosos: "+str(proceso["path"]))  
+              print_c("     [X] Se ha detectado un proceso con el bit SUID/GUID activo y permisos peligrosos: "+str(proceso["path"]))  
                 
         else:
             resultados["seguros"] += 1
@@ -43,7 +49,7 @@ def auditar_suid_sgid(verbose):
     # Info en caso de verbose
     if verbose:
         procesos_tot = len(res_consulta)
-        print("   [i] De los "+str(procesos_tot)+" procesos con SUID/GUID activos, "+str(resultados.get("seguros"))+" de ellos se han catalogado como seguros")
+        print_c("   [i] De los "+str(procesos_tot)+" procesos con SUID/GUID activos, "+str(resultados.get("seguros"))+" de ellos se han catalogado como seguros")
             
     
     return resultados
@@ -62,7 +68,8 @@ def auditar_suid_sgid(verbose):
 #########################################################################################################
 
 def auditar_archivos_criticos(verbose):
-    print("[+] Auditando permisos y propietarios de archivos críticos")
+    print("")
+    print_c("[+] Auditando permisos y propietarios de archivos críticos")
     # Cargamos datos e inicializamos variables
     try:
         archivos_yaml = config["hardening"]["critical_files"]
@@ -118,7 +125,7 @@ def auditar_archivos_criticos(verbose):
         
         # Comprobamos si el archivo existe
         if not archivo_obt:
-            print("     [ERROR] El archivo "+str(archivo)+" no se ha encontrado en el sistema")
+            print_c("     [ERROR] El archivo "+str(archivo)+" no se ha encontrado en el sistema")
             formato["archivo"] = str(archivo)
             formato["estado"] = 'NO ENCONTRADO'
             formato["problemas"] = ["El archivo no ha sido encontrado en el sistema"]
@@ -155,10 +162,9 @@ def auditar_archivos_criticos(verbose):
             formato["problemas"] = problemas
             resultados.append(formato)
             if verbose:
-                print("     [X] El archivo "+str(archivo)+" no cumple los requisitos de seguridad establecidos ")
-                print("         | Fallos de seguridad detectados:")
+                print_c("     [X] El archivo "+str(archivo)+" no cumple los requisitos de seguridad establecidos ")
                 for p in problemas:
-                    print("         - "+str(p))
+                    print_c("         - "+str(p))
         
         else: 
             formato["archivo"] = archivo
@@ -166,7 +172,7 @@ def auditar_archivos_criticos(verbose):
             formato["problemas"] = "Ninguno, el archivo es seguro"
             resultados.append(formato)
             if verbose:
-                print("     [V] El archivo "+str(archivo)+" cumple con los requisitos de seguridad indicados")
+                print_c("     [Ok] El archivo "+str(archivo)+" cumple con los requisitos de seguridad indicados")
             
     return resultados
 
@@ -185,11 +191,13 @@ def auditar_archivos_criticos(verbose):
 ###################################################################################################################################
 
 def auditar_ssh(verbose):
-    print("[+] Auditando configuración de seguridad SSH")
+    print("")
+    print_c("[+] Auditando configuración de seguridad SSH")
     resultados =  {
         "estado": "PELIGROSO",
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_ssh": [] 
     }
     
     # Cargamos los datos del .yaml
@@ -202,16 +210,13 @@ def auditar_ssh(verbose):
         ssh_usu = None
         
         
-        
     # Comprobamos si ssh está instalado, en caso de que no lo esté marcamos el servicio como seguro
     if not os.path.exists('/etc/ssh/sshd_config'):
         resultados["estado"] = "SEGURO"
         resultados["detalles"] = "El servicio ssh no está instalado en el sistema, por lo que no puede ser vulnerable"
         if verbose:
-            print("     [i] "+str(resultados.get("detalles")))
+            print_c("     [i] "+str(resultados.get("detalles")))
         return resultados
-
-
 
     # Obtenemos el archivo ssh y lo leemos en busqueda de los parametros de config indicados en el .yaml
     contenido_ssh = {}
@@ -230,7 +235,7 @@ def auditar_ssh(verbose):
                     valor = " ".join(partes[1:]) # Por si el valor tiene espacios
                     contenido_ssh[clave] = valor
     except Exception as e:
-        print("     [ERROR] Fallo al leer '/etc/ssh/sshd_config': "+str(e))
+        print_c("     [ERROR] Fallo al leer '/etc/ssh/sshd_config': "+str(e))
         resultados["alertas"] = "No se ha logrado leer el archivo de configuración"
         return resultados
     
@@ -242,39 +247,44 @@ def auditar_ssh(verbose):
             if contenido_ssh[atributo].lower() == ssh_params[atributo].lower():
                 detalle = 'El parametro '+str(atributo)+' cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
                 resultados["detalles"].append(detalle)
+                resultados["tabla_ssh"].append({"param": atributo, "estado": "OK", "desc": detalle})
                 if verbose:
-                    print("     [V] "+str(detalle))
+                    print_c("     [Ok] "+str(detalle))
             
             # En caso de que no tenga el mismo valor lo indicamos
             else:
                 alerta = 'El parametro '+str(atributo)+' no cumple la política de seguridad indicada ('+str(ssh_params[atributo])+')'
                 resultados["alertas"].append(alerta)
+                resultados["tabla_ssh"].append({"param": atributo, "estado": "RIESGO", "desc": alerta})
                 if verbose:
-                    print("     [X] "+str(alerta))
+                    print_c("     [X] "+str(alerta))
         
         # Si no aparece en la configuración lo indicamos
         else:
             alerta = 'El parametro '+str(atributo)+' no está configurado en el servicio ssh'
             resultados["alertas"].append(alerta)
+            resultados["tabla_ssh"].append({"param": atributo, "estado": "FALTA", "desc": alerta}) 
             if verbose:
-                print("     [!] "+str(alerta))
+                print_c("     [!] "+str(alerta))
                 
                 
     # Comprobamos que no se ejecuta en el puerto 22 (para evitar ataques de bots)
     if contenido_ssh.get("Port", "22") == "22":
         alerta = 'El puerto en el que se está ejecutando SSH es por defecto (22), es vulnerable a ataques de bots automatizados'
         resultados["alertas"].append(alerta)
+        resultados["tabla_ssh"].append({"param": "Port", "estado": "RIESGO", "desc": alerta})
         if verbose:
-            print("     [X] "+str(alerta))
+            print_c("     [X] "+str(alerta))
         
     else: # En caso de que no se ejecute en el p22
         detalle = 'El servicio se está ejecutando en el puerto '+str(contenido_ssh.get("Port"))
         resultados["detalles"].append(detalle)
+        resultados["tabla_ssh"].append({"param": "Port", "estado": "OK", "desc": detalle})
         if verbose:
-            print("     [V] "+str(detalle))
+            print_c("     [Ok] "+str(detalle))
     
     
-    ##################### Comprobamos los usuarios
+    ##################### Comprobamos los usuarios #######################################################################
     if ssh_usu:
         usuarios_actuales_str = contenido_ssh.get("AllowUsers", "")
         lista_actuales = usuarios_actuales_str.split() # Lo convertimos en lista separando por espacios
@@ -286,22 +296,24 @@ def auditar_ssh(verbose):
         if not faltan and not sobran and usuarios_actuales_str:
             detalle = 'La directiva AllowUsers coincide exactamente con los usuarios permitidos en la política.'
             resultados["detalles"].append(detalle)
+            resultados["tabla_ssh"].append({"param": "AllowUsers", "estado": "OK", "desc": detalle}) # [NUEVO]
             if verbose:
-                print("     [V] " + str(detalle))
+                print_c("     [Ok] " + str(detalle))
         else:
             alerta = 'La lista de usuarios permitidos (AllowUsers) no coincide. Esperado: ' + " ".join(ssh_usu) + ' | Actual: ' + usuarios_actuales_str
             resultados["alertas"].append(alerta)
+            resultados["tabla_ssh"].append({"param": "AllowUsers", "estado": "RIESGO", "desc": alerta}) # [NUEVO]
             if verbose:
-                print("     [X] " + str(alerta))
+                print_c("     [X] " + str(alerta))
     
     
     # Catalogamos el resultado final
     if len(resultados["alertas"]) == 0:
         resultados["estado"] = 'SEGURO'
         if verbose:
-            print("     [V] Se cumplen todas las políticas de seguridad en ssh")
+            print_c("     [Ok] Se cumplen todas las políticas de seguridad en ssh")
     elif verbose:
-        print("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
+        print_c("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
     
     return resultados
 
@@ -324,19 +336,26 @@ def auditar_ssh(verbose):
 
 #########################################################################################################################################################
 def auditar_firewall(verbose):
-    print("[+] Comprobando el estado del Firewall")
+    print("")
+    print_c("[+] Comprobando el estado del Firewall")
     
     resultado = {
         "estado": "PELIGROSO",
-        "firewall_activo": "Ninguno",
-        "detalles": [],
+        "servicios": [], 
+        "kernel": {
+            "reglas_bloqueo": 0,
+            "politica_accept": False,
+            "bloqueo_output": False,
+            "bloqueo_forward": False,
+            "tipo_filtro": "Desconocido"
+        },
         "alertas": []
     }
+    
     try:
         lista_firewalls = config["hardening"]["firewall_services"]
-    
     except KeyError:
-        print("     [ERROR] No se han podido cargar los firewalls de la config.yaml")
+        print_c("     [ERROR] No se han podido cargar los firewalls de la config.yaml")
         lista_firewalls = []
         
     servicios_activos = []
@@ -351,119 +370,151 @@ def auditar_firewall(verbose):
         # Comprobamos si exsten los firewalls en el sistema e iteramos sobre la respuesta
         if resultado_consulta:
             for servicio in resultado_consulta:
-                nombre = servicio.get("id").replace(".service", "") # Limpiamos el nombre por comodidad ya que todos terminan en .service
+                # Limpiamos el nombre por comodidad ya que todos terminan en .service
+                nombre = servicio.get("id").replace(".service", "") 
                 estado_actu = servicio.get("active_state")
                 estado_arranque = servicio.get("unit_file_state")
                 
+                esta_activo = (estado_actu == 'active') # Equivalente a un if, si se cumple la condición esta_activo será true, por el contrario false
+                
                 # Comprobamos si está activo y si por defecto se inicia al arrancar el sistema 
-                if estado_actu == 'active':
+                if esta_activo:
                     servicios_activos.append(nombre)
                     
                     # Comprobamos si no está configurado para arrancar al iniciar el sistema
                     if estado_arranque != 'enabled':
-                        alerta = "El gestor '" + nombre + "' está encendido ahora, pero no arrancará tras un reinicio (estado: " + str(estado_arranque) + ")"
+                        alerta = "El gestor '" + nombre + "' se encuentra activo, pero no se ha configurado que arranque al reiniciarse el sistema"
                         resultado["alertas"].append(alerta)
                         if verbose:
-                            print("     [!] " + alerta)
+                            print_c("     [!] " + alerta)
+                    else:
+                        if verbose:
+                            print_c("     [Ok] El gestor '" + nombre + "' está activo y arranca por defecto en el sistema")
                             
                 # Caso de que esté configurado para arrancar siempre, pero actualmente está apagado o caído
                 elif estado_arranque == 'enabled' and estado_actu != 'active':
-                    alerta = "El gestor '" + nombre + "' debería estar encendido de forma persistente (enabled), pero actualmente está APAGADO."
+                    alerta = "El gestor '" + nombre + "' debería estar encendido cada vez que se reinicia el sistema, pero actualmente está apagado"
                     resultado["alertas"].append(alerta)
                     if verbose:
-                        print("     [!] " + alerta)
+                        print_c("     [!] " + alerta)
+
+                resultado["servicios"].append({
+                    "nombre": nombre,
+                    "activo": esta_activo,
+                    "arranque": estado_arranque
+                })
 
     ############## Comprobación de si ay normas activas (de bloquear y descartar) ########################################
     reglas_bloqueo = 0
     politica_accept = False
     bloqueo_output = False
     bloqueo_forward = False
+    tipo_encontrado = "Desconocido" 
+    
+    iptables_funciona = False 
+    nftables_funciona = False 
     
     # Tratamos de obtener las normas actuales del sistema con iptables -S (similar a las interfaces de networking)
     # de esta forma buscamos las políticas que hemos obtenido y rechazan o bloquean peticiones (si no hay ninguna de este
     # timpo, el firewall no estará filtrando nada, por lo que en la práctica sería como si no estuviese activo)
     try:
         # Leemos todas las posibles cadenas (OUTPUT, FORWARD, etc.)
-        res_iptables = subprocess.run(["iptables", "-S"], capture_output=True, text=True)
+        res_iptables = subprocess.run(["iptables", "-S"], capture_output=True, text=True, timeout=2)
         if res_iptables.returncode == 0:
+            tipo_encontrado = "IPtables"
+            iptables_funciona = True 
             for linea in res_iptables.stdout.splitlines():
                 # Buscamos políticas por defecto permisivas
-                if "-P INPUT ACCEPT" in linea:
+                if "-P INPUT ACCEPT" in linea: 
                     politica_accept = True
                     
                 # Buscamos reglas generales de bloqueo
-                if "-P INPUT DROP" in linea or "-j DROP" in linea or "-j REJECT" in linea:
+                if "-P INPUT DROP" in linea or "-j DROP" in linea or "-j REJECT" in linea: 
                     reglas_bloqueo += 1
                     
                 # Buscamos reglas de OUTPUT y FORWARD
-                if "OUTPUT" in linea and ("DROP" in linea or "REJECT" in linea):
+                if "OUTPUT" in linea and ("DROP" in linea or "REJECT" in linea): 
                     bloqueo_output = True
-                if "FORWARD" in linea and ("DROP" in linea or "REJECT" in linea):
+                if "FORWARD" in linea and ("DROP" in linea or "REJECT" in linea): 
                     bloqueo_forward = True
         elif verbose:
-            print("     [DEBUG] iptables devolvió error: " + res_iptables.stderr.strip().replace('\n', ' '))
+            print_c("     [DEBUG] iptables devolvió error: " + res_iptables.stderr.strip().replace('\n', ' '))
     except FileNotFoundError:
         # Falla si los comandos iptables no están instalados en el sistema
         pass
     except Exception as e:
         if verbose:
-            print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+            print_c("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
             
     # En algunos sistemas podemos no tener la opción anterior, por lo que lo volvemos a intentar esta vez
     # con Nftables (versión más moderna)
-    if reglas_bloqueo == 0:
+    if not iptables_funciona:
         try:
-            res_nft = subprocess.run(["nft", "list", "ruleset"], capture_output=True, text=True)
+            res_nft = subprocess.run(["nft", "list", "ruleset"], capture_output=True, text=True, timeout=2)
             if res_nft.returncode == 0:
+                tipo_encontrado = "Nftables"
+                nftables_funciona = True
+                
                 # Convertimos toda la salida a minúsculas para buscar fácilmente
                 salida_nft = res_nft.stdout.lower()
                 
-                if "policy accept" in salida_nft:
+                if "policy accept" in salida_nft: 
                     politica_accept = True
-                if "drop" in salida_nft or "reject" in salida_nft:
+                if "drop" in salida_nft or "reject" in salida_nft: 
                     reglas_bloqueo += 1
-                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
+                if "output" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): 
                     bloqueo_output = True
-                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft):
+                if "forward" in salida_nft and ("drop" in salida_nft or "reject" in salida_nft): 
                     bloqueo_forward = True
             elif verbose:
-                print("     [DEBUG] nft devolvió error: " + res_nft.stderr.strip().replace('\n', ' '))
+                print_c("     [DEBUG] nft devolvió error: " + res_nft.stderr.strip().replace('\n', ' '))
         except FileNotFoundError:
             # Falla si los comandos nft no están instalados en el sistema
             pass
         except Exception as e:
             if verbose:
-                print("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+                print_c("     [i] No se pudieron comprobar las reglas del kernel directamente: " + str(e))
+
+    # Caso de que no haya ninguno de los 2 gestores
+    if not iptables_funciona and not nftables_funciona:
+        alerta_desc = "No se ha detectado un gestor de red conocido (NFtables o IPtables)"
+        resultado["alertas"].append(alerta_desc)
+        if verbose:
+            print_c("     [?] " + alerta_desc)
+
+    resultado["kernel"]["tipo_filtro"] = tipo_encontrado
+    resultado["kernel"]["reglas_bloqueo"] = reglas_bloqueo
+    resultado["kernel"]["politica_accept"] = politica_accept
+    resultado["kernel"]["bloqueo_output"] = bloqueo_output
+    resultado["kernel"]["bloqueo_forward"] = bloqueo_forward
     
     ########### Clasificamos los resultados obtenidos ################################################################
     if reglas_bloqueo > 0:
         resultado["estado"] = "SEGURO"
         # Caso de que el firewall está en systemd y tiene reglas de bloqueo en el kernel
         if len(servicios_activos) > 0:
-            resultado["firewall_activo"] = " / ".join(servicios_activos)
-            resultado["detalles"].append('El sistema está protegido por '+resultado["firewall_activo"]+' y por '+str(reglas_bloqueo)+' reglas de bloqueo')
+            fw_activo = " / ".join(servicios_activos)
             if verbose:
-                print("     [V] "+resultado["detalles"][-1])
-        
+                print_c("     [Ok] El sistema está protegido por " + fw_activo + " y por " + str(reglas_bloqueo) + " reglas de bloqueo")
         # Caso de que el firewall no se está ejecutando pero hay reglas en el kernel
         else:
-            resultado["firewall_activo"] = "Reglas de bloqueo manuales"
-            resultado["detalles"].append('No se ha detectado ningún servicio de getión activo, pero el sistema está protegido por '+str(reglas_bloqueo)+' reglas de bloqueo')
             if verbose:
-                print("     [V] "+resultado["detalles"][-1])
+                print_c("     [Ok] No se ha detectado ningún servicio de gestión activo, pero el sistema está protegido por " + str(reglas_bloqueo) + " reglas de bloqueo")
     
     # Caso de que aunque está activo un firewall no hay reglas de bloqueo en el kernel, por lo que no se filtra
     elif len(servicios_activos) > 0:
-        resultado["firewall_activo"] = " / ".join(servicios_activos)
-        resultado["alertas"].append('Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
+        alerta = 'Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real'
+        resultado["alertas"].append(alerta)
         if verbose:
-            print('     [!] Aunque se han detectado servicios de firewall activos en el sistema, no existen reglas de bloqueo, por lo que no se está ejerciendo ningún filtro real')
-    
+            print_c("     [!] " + alerta)
+            
     # No hay ni firewall ni reglas
     else:
-        resultado["alertas"].append('No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
-        if verbose:
-            print('     [X] No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red')
+        if iptables_funciona or nftables_funciona:
+            alerta = 'No se han detectado ni firewalls ni reglas de bloqueo activas, el sistema se encuentra expuesto a la red'
+            resultado["alertas"].append(alerta)
+            if verbose:
+                print_c("     [X] " + alerta)
             
     ############## Alertas extra ####################################################################################
     # Solo alertamos si el firewall está activo o hay reglas, porque si está apagado ya lo hemos dicho arriba.
@@ -472,19 +523,19 @@ def auditar_firewall(verbose):
             alerta_pol = "El firewall tiene políticas por defecto permisivas (ACCEPT). Se recomienda 'Default Deny'"
             resultado["alertas"].append(alerta_pol)
             if verbose:
-                print("     [!] " + alerta_pol)
+                print_c("     [!] " + alerta_pol)
                 
         if not bloqueo_output:
             alerta_out = "No se han detectado reglas de bloqueo en la cadena OUTPUT"
             resultado["alertas"].append(alerta_out)
             if verbose:
-                print("     [!] " + alerta_out)
+                print_c("     [!] " + alerta_out)
                 
         if not bloqueo_forward:
             alerta_fwd = "No se han detectado reglas de bloqueo en la cadena FORWARD"
             resultado["alertas"].append(alerta_fwd)
             if verbose:
-                print("     [!] " + alerta_fwd)
+                print_c("     [!] " + alerta_fwd)
     
     return resultado
 
@@ -503,7 +554,8 @@ def auditar_firewall(verbose):
 
 #######################################################################################################################
 def auditar_aslr(verbose):
-    print("[+] Comprobando si ASLR en el Kernel")
+    print("")
+    print_c("[+] Comprobando si ASLR en el Kernel")
     resultado = {
         "estado": "PELIGROSO",
         "valor": 0,
@@ -522,17 +574,17 @@ def auditar_aslr(verbose):
         case 1:
             resultado["valor"] = 1
             if verbose:
-                print("     [!] El kernel tiene activadas protecciones por ASLR limitadas (no está randomizando la pila)")
+                print_c("     [!] El kernel tiene activadas protecciones por ASLR limitadas (no está randomizando la pila)")
 
         case 2:
             resultado["estado"] = "SEGURO"
             resultado["valor"] = 2
             if verbose:
-                print("     [V] El kernel tiene activadas las protecciones por ASLR correctamente")
+                print_c("     [Ok] El kernel tiene activadas las protecciones por ASLR correctamente")
                 
         case _:
             if verbose:
-                print("     [X] El kernel no tinene activadas las protecciones por ASLR")
+                print_c("     [X] El kernel no tinene activadas las protecciones por ASLR")
     
     return resultado
 
@@ -548,12 +600,14 @@ def auditar_aslr(verbose):
 
 #################################################################################################################################
 def auditar_mac(verbose):
-    print("[+] Comprobando Control de Acceso Obligatorio (AppArmor/SELinux)...")
+    print("")
+    print_c("[+] Comprobando Control de Acceso Obligatorio")
+    
+    # Nuevo esquema de datos: Estructurado y limpio para tabular
     resultado = {
         "estado": "PELIGROSO",
-        "mac_activo": None,
-        "detalles": [],
-        "alertas": []
+        "apparmor": {"activo": False, "enforce": 0, "complain": 0},
+        "selinux": {"activo": False, "modo": "Deshabilitado"}
     }
     
     seguro = False
@@ -573,63 +627,62 @@ def auditar_mac(verbose):
             complain = 0
             
             if verbose:
-                print("     [i] Se ha detectado AppArmor como sistema de Control de Acceso Obligatorio")
+                print_c("     [i] Se ha detectado AppArmor como sistema de Control de Acceso Obligatorio")
+            
             for linea in res_AppArmor:
                 modo = linea.get("mode")
-                tot = linea.get("total",0)
+                tot = linea.get("total", 0)
                 
                 # Clasificamos los procesos
-                if modo == 'enforce':
+                if modo == 'enforce': 
                     enforce = int(tot)
-                if modo == 'complain':
+                if modo == 'complain': 
                     complain = int(tot)
-        
+            
+            # Guardamos 
+            resultado["apparmor"]["activo"] = True
+            resultado["apparmor"]["enforce"] = enforce
+            resultado["apparmor"]["complain"] = complain
+            
             if enforce > 0:
                 resultado["estado"] = "SEGURO"
-                resultado["mac_activo"] = "AppArmor"
-                resultado["detalles"].append(str(enforce) + " perfiles de AppArmor en modo 'enforce' (Activos)")
-                seguro = True
+                seguro = True # Ponemos seguro a True para que no salte el print final de error
                 if verbose:
-                    print("         - Se han detectado "+str(enforce)+" procesos marcados en modo 'enforce'")
+                    print_c("         - Se han detectado " + str(enforce) + " procesos marcados en modo 'enforce'")
                     
-            if complain > 0:
-                resultado["mac_activo"] = "AppArmor"
-                alerta = "Se han detectado "+str(complain)+" procesos marcados en modo 'complain'"
-                resultado["alertas"].append(alerta)
-                if verbose:
-                    print("         - "+alerta)
-            
+            if complain > 0 and verbose:
+                print_c("         - Se han detectado " + str(complain) + " procesos marcados en modo 'complain'")
+                
     # Ahora lo comprobamos con SELinux (Redhat)
     # Pre-check: Miramos si existe el archivo de SELinux para no lanzar la consulta si no lo tenemos instalado
     query_precheck = "SELECT path FROM file WHERE path = '/etc/selinux/config';"
     res_precheck = ejecutar_consulta(query_precheck)
     
-    # Solo entramos a consultar SELinux si el pre-check encontró el archivo
     if res_precheck and len(res_precheck) > 0:
         query_selinux = "SELECT value FROM selinux_settings WHERE name = 'enforce';"
         res_selinux = ejecutar_consulta(query_selinux)
         
+        # Solo entramos a consultar SELinux si el pre-check encontró el archivo
         if res_selinux and len(res_selinux) > 0:
             valor_selinux = str(res_selinux[0].get("value", ""))
+            resultado["selinux"]["activo"] = True
             
             if valor_selinux == "1":
                 resultado["estado"] = "SEGURO"
-                if seguro:
-                    resultado["mac_activo"] += " y SELinux"
-                else:
-                    resultado["mac_activo"] = "SELinux"
-                resultado["detalles"].append("SELinux activo en modo 'enforcing' (Bloqueando amenazas)")
+                resultado["selinux"]["modo"] = "Enforcing"
                 seguro = True # Ponemos seguro a True para que no salte el print final de error
                 
-            elif valor_selinux == "0":
-                alerta = "SELinux está en modo 'permissive' (Solo avisa, no bloquea)"
-                resultado["alertas"].append(alerta)
                 if verbose:
-                    print("     [!] " + alerta)
-                
-    
+                    print_c("         - SELinux activo en modo 'enforcing' (Bloqueando amenazas)")
+                    
+            elif valor_selinux == "0":
+                resultado["selinux"]["modo"] = "Permissive"
+                if verbose:
+                    print_c("     [!] SELinux está en modo 'permissive' (Solo avisa, no bloquea)")
+                    
     if not seguro:
-        print("     [X] No se ha encontrado ningún servicio de Control de Acceso Obligatorio activo (AppArmor o SELinux)")
+        print_c("     [X] No se ha encontrado ningún servicio MAC activo (AppArmor o SELinux)")
+        
     return resultado
 
 
@@ -641,11 +694,13 @@ def auditar_mac(verbose):
 
 ##################################################################################################################################
 def auditar_certificados(verbose):
-    print("[+] Comprobando Certificados y Claves")
+    print("")
+    print_c("[+] Comprobando Certificados y Claves")
     resultados = {
         "estado": "PELIGROSO",
         "detalles": [],
-        "alertas": []
+        "alertas": [],
+        "tabla_certificados": [] 
     }
     
     #Obtenemos la info  de settings.yaml 
@@ -667,7 +722,7 @@ def auditar_certificados(verbose):
         resultados["estado"] = "SEGURO"
         resultados["detalles"] = "No hay rutas críticas de certificados definidas para auditar"
         if verbose:
-            print("     [i] "+str(resultados["detalles"]))
+            print_c("     [i] "+str(resultados["detalles"]))
         return resultados
 
 
@@ -677,13 +732,23 @@ def auditar_certificados(verbose):
         tipo = archivo.get("tipo")
         max_permisos_esp = archivo.get("max_permissions")
         dueno_esp = archivo.get("owner")
+        
+        info_cert = {
+            "ruta": ruta,
+            "tipo": tipo.upper(),
+            "estado_color": "OK",
+            "problemas": []
+        }
 
         # Comprobamos si el archivo existe realmente
         if not os.path.exists(ruta):
             alerta = "No se encuentra el hash: "+str(ruta)
             resultados["alertas"].append(alerta)
+            info_cert["problemas"].append("Archivo no encontrado en el sistema")
+            info_cert["estado_color"] = "NO ENCONTRADO"
+            resultados["tabla_certificados"].append(info_cert)
             if verbose:
-                print("     [!] "+str(alerta))
+                print_c("     [!] "+str(alerta))
             continue
 
         file_stat = os.stat(ruta) # Guardamos todos los metadatos del archivo ()
@@ -695,8 +760,10 @@ def auditar_certificados(verbose):
             if dueno_actu != dueno_esp:
                 alerta = "El archivo "+str(ruta)+" no tiene el dueño esperado. Actual: "+str(dueno_actu)+" | Esperado: "+str(dueno_esp)
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Dueño incorrecto (Actual: "+str(dueno_actu)+")")
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
-                    print("     [X] "+str(alerta))
+                    print_c("     [X] "+str(alerta))
         except KeyError:
             pass 
             
@@ -711,22 +778,25 @@ def auditar_certificados(verbose):
         if (perm_actual & ~perm_max) != 0: 
             alerta = "El archivo "+str(ruta)+" tiene permisos excesivos. Actual: "+str(oct(perm_actual))+" | Máximo permitido: 0o"+str(max_permisos_esp)
             resultados["alertas"].append(alerta)
+            info_cert["problemas"].append("Permisos excesivos ("+str(oct(perm_actual))+")")
+            info_cert["estado_color"] = "PELIGROSO"
             if verbose:
-                print("     [X] "+str(alerta))
+                print_c("     [X] "+str(alerta))
         else:
             detalle = "El archivo "+str(ruta)+" tiene los permisos y propietario correctos"
             resultados["detalles"].append(detalle)
             if verbose:
-                print("     [V] "+str(detalle))
+                print_c("     [Ok] "+str(detalle))
 
         # Si el archivo es una clave privada, pasamos al siguiente 
         if tipo == "privado":
+            resultados["tabla_certificados"].append(info_cert)
             continue
 
 
         #################### Evaluamos el contenido criptográfico (solo públicos) ########################
         query = "SELECT not_valid_after, signing_algorithm, issuer, subject FROM certificates WHERE path = '"+str(ruta)+"';"
-        res_osquery = ejecutar_consulta(query) # Asegúrate de que usas tu función de DB correspondiente
+        res_osquery = ejecutar_consulta(query) 
 
         if res_osquery:
             datos = res_osquery[0]
@@ -741,22 +811,26 @@ def auditar_certificados(verbose):
                 if dias_restantes < 0:
                     alerta = "El certificado "+str(ruta)+" ha caducado hace "+str(abs(dias_restantes))+" días"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Caducado hace "+str(abs(dias_restantes))+" días")
+                    info_cert["estado_color"] = "PELIGROSO"
                     if verbose:
-                        print("     [X] "+str(alerta))
+                        print_c("     [X] "+str(alerta))
                         
                 # Caso de que falte poco para que caduque 
                 elif dias_restantes <= dias_aviso:
                     alerta = "El certificado "+str(ruta)+" caduca pronto (en "+str(dias_restantes)+" días)"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Caduca en "+str(dias_restantes)+" días")
+                    if info_cert["estado_color"] != "PELIGROSO": info_cert["estado_color"] = "ADVERTENCIA"
                     if verbose:
-                        print("     [!] "+str(alerta))
+                        print_c("     [!] "+str(alerta))
                         
                 # Caso de que aún quede tiempo
                 else:
                     detalle = "El certificado "+str(ruta)+" está en vigor. Caduca en "+str(dias_restantes)+" días"
                     resultados["detalles"].append(detalle)
                     if verbose:
-                        print("     [V] "+str(detalle))
+                        print_c("     [Ok] "+str(detalle))
                         
             except Exception:
                 pass
@@ -766,21 +840,25 @@ def auditar_certificados(verbose):
             if algo_actual not in algoritmos_permitidos:
                 alerta = "El certificado "+str(ruta)+" usa un algoritmo no permitido: "+str(algo_actual)
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Algoritmo débil: "+str(algo_actual))
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
-                    print("     [X] "+str(alerta))
+                    print_c("     [X] "+str(alerta))
             else:
                 detalle = "El certificado "+str(ruta)+" usa un algoritmo seguro ("+str(algo_actual)+")"
                 resultados["detalles"].append(detalle)
                 if verbose:
-                    print("     [V] "+str(detalle))
+                    print_c("     [Ok] "+str(detalle))
 
 
             ################ Verificamos si es autofirmado ########################################################
             if datos.get("issuer") == datos.get("subject"):
                 alerta = "El certificado "+str(ruta)+" está AUTOFIRMADO (Peligro en producción)"
                 resultados["alertas"].append(alerta)
+                info_cert["problemas"].append("Certificado Autofirmado")
+                info_cert["estado_color"] = "PELIGROSO"
                 if verbose:
-                    print("     [!] "+str(alerta))
+                    print_c("     [!] "+str(alerta))
 
         # Consultamos el tamaño de la clave y el EKU ejecutando openssl
         try:
@@ -795,36 +873,41 @@ def auditar_certificados(verbose):
                     if tamano < min_rsa:
                         alerta = "El certificado "+str(ruta)+" tiene una clave insuficiente: "+str(tamano)+" bits (Min: "+str(min_rsa)+")"
                         resultados["alertas"].append(alerta)
+                        info_cert["problemas"].append("Clave RSA muy corta ("+str(tamano)+" bits)")
+                        info_cert["estado_color"] = "PELIGROSO"
                         if verbose:
-                            print("     [X] "+str(alerta))
+                            print_c("     [X] "+str(alerta))
                     else:
                         detalle = "El tamaño de la clave del certificado "+str(ruta)+" es robusto ("+str(tamano)+" bits)"
                         resultados["detalles"].append(detalle)
                         if verbose:
-                            print("     [V] "+str(detalle))
+                            print_c("     [Ok] "+str(detalle))
 
                 # Obtenemos el permiso EKU
                 if "TLS Web Server Authentication" not in salida_ssl:
                     alerta = "El certificado "+str(ruta)+" no tiene el permiso 'Server Authentication'"
                     resultados["alertas"].append(alerta)
+                    info_cert["problemas"].append("Falta permiso EKU 'Server Authentication'")
+                    info_cert["estado_color"] = "PELIGROSO"
                     if verbose:
-                        print("     [X] "+str(alerta))
+                        print_c("     [X] "+str(alerta))
                 else:
                     detalle = "El certificado "+str(ruta)+" tiene el propósito 'Server Authentication' válido"
                     resultados["detalles"].append(detalle)
                     if verbose:
-                        print("     [V] "+str(detalle))
+                        print_c("     [Ok] "+str(detalle))
         except Exception:
             pass
 
+        resultados["tabla_certificados"].append(info_cert)
 
     #################### Catalogamos el resultado final ############################################
     if len(resultados["alertas"]) == 0:
         resultados["estado"] = 'SEGURO'
         if verbose:
-            print("     [V] Se cumplen todas las políticas de seguridad en certificados")
+            print_c("     [Ok] Se cumplen todas las políticas de seguridad en certificados")
     elif verbose:
-        print("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
+        print_c("     [!] Se han detectado "+str(len(resultados["alertas"]))+" configuraciones catalogadas como no seguras")
     
     return resultados
 
@@ -840,12 +923,18 @@ def auditar_certificados(verbose):
 
 
 #################################################################################################################################
+import subprocess
+
 def auditar_cifrado(verbose):
-    print("[+] Comprobando el cifrado de discos (LUKS/FDE)...")
+    print("")
+    print_c("[+] Comprobando el cifrado de discos (LUKS/FDE)...")
     resultados = {
         "estado": "PELIGROSO",
+        "lista_particiones": [],
+        "criticos_encontrados": [], 
+        "criticos_faltantes": [],
         "detalles": [],
-        "alertas":[]
+        "alertas": []
     }
     
     # Cargamos la config del .yaml
@@ -853,11 +942,10 @@ def auditar_cifrado(verbose):
         req_algoritmo = config["hardening"]["encryption"]["algoritmo"]
         critical_mounts = config["hardening"]["encryption"]["critical_mounts"]
     except KeyError:
-        print("     [ERROR] No se ha encontrado la configuración de cifrado en config.yaml")
+        print_c("     [ERROR] No se ha encontrado la configuración de cifrado en config.yaml")
         req_algoritmo = "sha256"
         critical_mounts = ["/", "/home", "/var"]
         
-    
     query = '''
         SELECT m.device, m.device_alias, m.path, m.type, de.encryption_status, de.encrypted
         FROM mounts m
@@ -883,13 +971,15 @@ def auditar_cifrado(verbose):
             if ruta in critical_mounts:
                 criticos_encontrados.append(ruta)
             
+            es_cifrada = (str(linea.get('encrypted', '0')) == '1') or (str(linea.get('encryption_status', '')) == 'encrypted')
+            algoritmo = "desconocido"
+            advertencia_algo = ""
+
             # Comprobamos si la partición está cifrada (se indica en 2 campos)
-            if (str(linea.get('encrypted', '0')) == '1') or (str(linea.get('encryption_status', '')) == 'encrypted'):
+            if es_cifrada:
                 tot_cifradas += 1
                 if ruta in critical_mounts:
                     criticos_cifrados.append(ruta)
-                    
-                algoritmo = "desconocido"
                 
                 # Vamos a tratar de obtener el algoritmo usado para el cifrado de la partición
                 try:
@@ -902,54 +992,59 @@ def auditar_cifrado(verbose):
                     pass
                 
                 # Comprobamos si usa el algo de cifrado especificado en el .yaml                
-                advertencia_algo = ""
                 if (req_algoritmo.lower() not in algoritmo.lower()) and (algoritmo != "desconocido"):
                     advertencia_algo =" (Usa "+algoritmo+", se recomienda "+req_algoritmo+")"
                     resultados["alertas"].append("El dispositivo "+dispositivo+" no usa el algoritmo recomendado: "+algoritmo)
 
-                
                 # Completamos el campo detalles con la info obtenida
                 detalle = "El dispositivo "+str(dispositivo)+" tiene una partición cifrada con punto de montaje en "+str(ruta)+" usando el algoritmo '"+str(algoritmo)+"'"+advertencia_algo
                 resultados["detalles"].append(detalle)
                 
                 if advertencia_algo != "" and verbose:
-                    print("     [!] "+str(detalle))
+                    print_c("     [!] "+str(detalle))
                 elif verbose: 
-                    print("     [V] "+str(detalle))
-        
-        
+                    print_c("     [Ok] "+str(detalle))
+            
             # En el caso de que la partición no esté cifrada
             else:
                 alerta = "El dispositivo "+str(dispositivo)+" tiene una partición sin cifrar con punto de montaje en "+str(ruta)
                 resultados["alertas"].append(alerta)
                 if verbose:
-                    print("     [X] "+str(alerta))
+                    print_c("     [X] "+str(alerta))
+
+            # Guardamos los datos estructurados
+            resultados["lista_particiones"].append({
+                "dispositivo": dispositivo,
+                "ruta": ruta,
+                "cifrada": es_cifrada,
+                "algoritmo": algoritmo,
+                "advertencia": advertencia_algo != ""
+            })
      
-     
-                    
     ######################## Catalogamos los resultados ######################################################################################
     
     # Sacamos las particiones críticas que existen en el sistema pero no están cifrados
     criticos_vulnerables = [m for m in criticos_encontrados if m not in criticos_cifrados]
+    resultados["criticos_faltantes"] = criticos_vulnerables
+    resultados["criticos_encontrados"] = criticos_encontrados
     
     if tot_particiones == 0:
         resultados["alertas"].append("No se detectaron particiones físicas válidas para auditar.")
-        if verbose: print("     [!] No se detectaron particiones físicas válidas.")
+        if verbose: print_c("     [!] No se detectaron particiones físicas válidas.")
         
     # Si no hay críticos vulnerables y hemos encontrado al menos uno crítico, es SEGURO
     elif len(criticos_vulnerables) == 0 and len(criticos_encontrados) > 0:
         resultados["estado"] = "SEGURO"
         resumen = f"Todos los montajes críticos detectados ({', '.join(criticos_encontrados)}) están cifrados."
         resultados["detalles"].append(resumen)
-        if verbose: print("     [V] " + resumen)
+        if verbose: print_c("     [Ok] " + resumen)
         
     else:
         # Falla si falta algún crítico por cifrar o si no hay ninguno cifrado
         alerta_peligro = "Falta cifrado en puntos de montaje críticos: " + ", ".join(criticos_vulnerables) if criticos_vulnerables else f"Ninguna de las {tot_particiones} particiones físicas está cifrada."
         resultados["alertas"].append(alerta_peligro)
-        if verbose: print("     [X] PELIGRO: " + alerta_peligro)
+        if verbose: print_c("     [X] PELIGRO: " + alerta_peligro)
         
-    
     return resultados
 
 
@@ -977,8 +1072,9 @@ def ESCANER_hardening(verbose):
         "cifrado": {}
     }
 
-    print("\n--- [ FASE 5: HARDENING DEL SISTEMA ] ---")
-    print("[+] Iniciando módulo de hardening")
+    mostrar_subtitulos("Hardening")
+    print("")
+    print_c("[+] Iniciando módulo de hardening")
     
     datos_reporte["suid_sgid"] = auditar_suid_sgid(verbose)
     datos_reporte["archivos_criticos"] = auditar_archivos_criticos(verbose)
@@ -988,7 +1084,7 @@ def ESCANER_hardening(verbose):
     datos_reporte["mac"] = auditar_mac(verbose)
     datos_reporte["certificados"] = auditar_certificados(verbose)
     datos_reporte["cifrado"] = auditar_cifrado(verbose)
-
-    print("[-] Finalizando módulo de hardening")
+    print("")
+    print_c("[-] Finalizando módulo de hardening")
     
     return datos_reporte

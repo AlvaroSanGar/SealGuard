@@ -1,0 +1,7 @@
+python-nmap
+PyYAML
+colorama
+osquery
+requests
+weasyprint
+Jinja2

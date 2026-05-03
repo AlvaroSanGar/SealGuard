@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Obligar al script a situarse en su propio directorio
+cd "$(dirname "$0")" || exit 1
+
+# Auto-escalada de privilegios (Sudo automático)
+if [ "$EUID" -ne 0 ]; then
+    # Ejecuta este mismo script con sudo, pasándole exactamente los mismos argumentos
+    exec sudo "$0" "$@"
+    # Si el usuario cancela el prompt de la contraseña, el script termina aquí
+    exit 1
+fi
+
+# Gestión del entorno virtual
+if [ ! -d "venv" ]; then
+    echo -e "\e[36m[i]\e[0m Entorno virtual no detectado. Creándolo e instalando dependencias..."
+    python3 -m venv venv
+    
+    if [ -f "requirements.txt" ]; then
+        ./venv/bin/pip install -r requirements.txt
+    else
+        echo -e "\e[31m[ERROR]\e[0m ¡No se encuentra el archivo 'requirements.txt' en la carpeta actual!"
+        exit 1
+    fi
+fi
+
+# Ejecutar la aplicación
+./venv/bin/python main.py "$@"

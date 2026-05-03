@@ -5,7 +5,7 @@ import modules.integrity as mIntegrity
 
 # Mockeamos el settings.yaml para no depender de archivos reales
 MOCK_CONFIG = {
-    "system": {
+    "hardening": {  
         "critical_files": [{"path": "/etc/shadow"}]
     },
     "integrity": {
@@ -14,7 +14,7 @@ MOCK_CONFIG = {
     }
 }
 
-@patch.dict('modules.integrity.config', MOCK_CONFIG)
+@patch.dict('modules.integrity.config', MOCK_CONFIG, clear=True)
 class TestIntegridadModulo(unittest.TestCase):
 
     # =========================================================================

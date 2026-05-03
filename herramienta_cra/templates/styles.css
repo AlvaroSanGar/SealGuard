@@ -1,0 +1,514 @@
+/* styles.css */
+@page {
+    size: A4;
+    margin: 2cm;
+    @bottom-right {
+        content: "Página " counter(page) " de " counter(pages);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 9pt;
+        color: #7f8c8d;
+    }
+}
+
+body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #2c3e50;
+    line-height: 1.5;
+    font-size: 10pt;
+}
+
+:root {
+    --navy-blue: #0A2540;
+    --primary-blue: #0066CC;
+    --light-blue: #E6F0FA;
+    --bg-gray: #f8fbfe;
+    --border-gray: #bdc3c7;
+}
+
+/* Portada */
+.cover-page {
+    text-align: center;
+    margin-top: 30px;
+    height: 800px;
+}
+
+.logo-container { 
+    margin-bottom: 30px; 
+}
+
+.logo-container img { 
+    max-width: 500px; 
+    height: auto; 
+}
+
+
+.cover-subtitle { 
+    font-size: 16pt; 
+    color: #7f8c8d; 
+    margin-bottom: 10px;
+    margin-top: -50px; 
+    font-weight: normal; 
+    border-top: 3px solid var(--primary-blue); 
+    padding-top: 15px;
+    display: inline-block;
+}
+.cover-details { margin-top: 80px; text-align: left; background: var(--bg-gray); padding: 30px; border-radius: 8px; border: 1px solid var(--border-gray); }
+
+
+/* --- LAYOUT DEL RESUMEN EJECUTIVO --- */
+.summary-layout-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+    margin-bottom: 30px;
+}
+
+.summary-layout-table td {
+    border: none;
+    vertical-align: top;
+}
+
+.summary-col-left {
+    width: 60%;
+    padding-right: 25px;
+}
+
+.summary-col-right {
+    width: 40%;
+}
+
+/* --- UTILIDADES DE ESPACIADO --- */
+.mt-0 { margin-top: 0 !important; }
+.col-w-35 { width: 35%; }
+
+.summary-title-top {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.summary-title-mid {
+    margin-top: 25px;
+    margin-bottom: 10px;
+}
+
+/* --- TARJETA DE ESTADO GLOBAL Y GRÁFICO --- */
+.summary-card {
+    text-align: center;
+    background: #f8fbfe;
+    border: 1px solid #bdc3c7;
+    border-radius: 12px;
+    padding: 25px;
+}
+
+.summary-card h3 {
+    margin-top: 0;
+    color: #1f2937;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 10px;
+    font-size: 14pt;
+}
+
+.donut-container {
+    position: relative;
+    display: inline-block;
+    margin-top: 20px;
+}
+
+.donut-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.donut-number {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.donut-label {
+    font-size: 8.5pt;
+    color: #6b7280;
+}
+
+/* --- LEYENDA DEL GRÁFICO --- */
+.chart-legend-container {
+    text-align: left;
+    font-size: 10pt;
+    margin-top: 30px;
+    padding-left: 20px;
+}
+
+.legend-item {
+    margin-bottom: 8px;
+}
+
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+
+
+/* Títulos y Secciones */
+h1.section-title {
+    color: var(--navy-blue);
+    font-size: 18pt;
+    margin-top: 40px;
+    border-bottom: 2px solid var(--primary-blue);
+    padding-bottom: 8px;
+    page-break-before: always; 
+}
+
+h2.subsection-title {
+    color: var(--primary-blue);
+    font-size: 14pt;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    border-bottom: 1px dashed #ecf0f1;
+    padding-bottom: 5px;
+}
+
+/* Tablas */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 25px; font-size: 9pt; }
+.data-table th { background-color: var(--navy-blue); color: white; text-align: left; padding: 10px; }
+.data-table td { padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }
+.data-table tr:nth-child(even) { background-color: var(--bg-gray); }
+
+/* Matriz de Cumplimiento (Resumen) */
+.matrix-table th { background-color: #34495e; }
+.matrix-table td.module-name { font-weight: bold; width: 40%; }
+
+/* Cajas de Info/Alertas */
+.info-box { background: var(--bg-gray); border-left: 4px solid var(--primary-blue); padding: 15px; margin-bottom: 20px; }
+.alert-box { background: #fdf2e9; border-left: 4px solid #e74c3c; padding: 15px; margin-bottom: 20px; }
+.success-box { background: #e9f7ef; border-left: 4px solid #27ae60; padding: 15px; margin-bottom: 20px; }
+
+/* Badges */
+.badge { padding: 4px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold; color: white; display: inline-block; text-transform: uppercase; }
+.bg-danger { background-color: #e74c3c; }   
+.bg-warning { background-color: #f39c12; }  
+.bg-safe { background-color: #27ae60; }     
+.bg-info { background-color: var(--primary-blue); } 
+
+.text-center { text-align: center; }
+ul { margin-top: 5px; padding-left: 20px; }
+
+/* --- ESTILOS DEL ÍNDICE --- */
+.toc-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 30px;
+}
+
+.toc-list li {
+    margin-bottom: 15px;
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+.toc-list a {
+    text-decoration: none;
+    color: var(--navy-blue);
+}
+
+/* Magia de WeasyPrint: Pone los puntitos y el número de página automáticamente */
+.toc-list a::after {
+    content: leader('.') target-counter(attr(href), page);
+    color: #7f8c8d;
+    font-weight: normal;
+}
+
+
+.summary-layout-table {
+    width: 100%;
+    border: none;
+    margin-bottom: 30px;
+}
+
+.summary-col-left {
+    width: 60%;
+    vertical-align: top;
+    padding-right: 20px;
+}
+
+/* Quitamos el margen superior al título para que alinee bien */
+.summary-col-left .subsection-title {
+    margin-top: 0;
+}
+
+.summary-col-right {
+    width: 40%;
+    text-align: center;
+    vertical-align: top;
+    background: var(--bg-gray);
+    border-radius: 8px;
+    border: 1px solid var(--border-gray);
+    padding: 15px;
+}
+
+.chart-title {
+    color: var(--navy-blue);
+    margin-top: 0;
+    font-size: 12pt;
+}
+
+.donut-chart {
+    margin: 10px auto;
+    display: block;
+}
+
+.chart-legend {
+    font-size: 9pt;
+    text-align: left;
+    padding-left: 20px;
+}
+
+/* Colores de texto para la leyenda */
+.text-safe { color: #27ae60; }
+.text-warn { color: #f39c12; }
+.text-danger { color: #e74c3c; }
+
+/* --- ESTILOS PARA LAS INTERFACES DE RED --- */
+.interface-header {
+    background-color: var(--light-blue);
+    color: var(--navy-blue);
+    padding: 10px 15px;
+    border-left: 5px solid var(--primary-blue);
+    margin-top: 30px;
+    margin-bottom: 0; /* Pegado a la tabla */
+    font-size: 12pt;
+    border-radius: 4px 4px 0 0;
+}
+
+/* Ajuste para la tabla que va debajo de la cabecera de interfaz */
+.table-interface {
+    margin-top: 0;
+    border-top: none;
+}
+
+/* --- GESTIÓN DE VULNERABILIDADES (CVEs) --- */
+
+/* Anchos de columnas para las tablas */
+.col-w-15 { width: 15%; }
+.col-w-20 { width: 20%; }
+.col-w-50 { width: 50%; }
+
+/* Espaciado pequeño para badges */
+.mb-sm { margin-bottom: 6px; }
+
+/* Contenedor de la lista de CVEs */
+.vuln-list-container {
+    font-size: 8pt;
+    color: #444;
+    line-height: 1.5;
+}
+
+/* Colores dinámicos por severidad CVSS */
+.cvss-critical {
+    color: #c0392b; /* Rojo oscuro */
+    font-weight: bold;
+}
+
+.cvss-high {
+    color: #e74c3c; /* Rojo estándar */
+    font-weight: bold;
+}
+
+.cvss-medium {
+    color: #f39c12; /* Naranja */
+    font-weight: bold;
+}
+
+/* Texto de omisión de vulnerabilidades */
+.vuln-omitted-text {
+    color: #7f8c8d;
+    font-style: italic;
+    margin-top: 4px;
+    display: block;
+}
+
+
+
+/* --- TABLAS DE USUARIOS --- */
+.text-xs {
+    font-size: 8pt;
+}
+
+.col-path {
+    word-break: break-all; /* Para que las rutas largas no rompan la tabla */
+    max-width: 150px;
+}
+
+.col-desc {
+    font-style: italic;
+    color: #666;
+}
+
+.badge-group {
+    background-color: #f1f4f9;
+    color: var(--navy-blue);
+    border: 1px solid var(--border-gray);
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-right: 2px;
+    white-space: nowrap;
+}
+
+/* --- SECCIÓN MFA / 2FA --- */
+.table-details-list {
+    margin: 0;
+    padding-left: 15px;
+    list-style-type: disc;
+    font-size: 8.5pt;
+    color: #555;
+}
+
+.col-mfa-status { width: 15%; text-align: center; }
+.col-mfa-details { width: 55%; }
+.col-token-status { width: 20%; text-align: center; }
+
+
+/* --- UTILIDADES DE TEXTO Y ESTADOS --- */
+.text-safe-bold { color: #27ae60; font-weight: bold; }
+.text-warn-bold { color: #f39c12; font-weight: bold; }
+.text-danger-bold { color: #e74c3c; font-weight: bold; }
+.text-muted { color: #999; }
+.bg-secondary { background-color: #95a5a6; } 
+
+
+
+/* --- FIREWALL STYLES --- */
+.status-indicator {
+    font-weight: bold;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+.status-on { background-color: #27ae60; }
+.status-off { background-color: #e74c3c; }
+
+
+/* --- CIFRADO DE DISCOS --- */
+.col-disk { width: 25%; }
+.col-mount { width: 15%; }
+.col-enc-status { width: 20%; text-align: center; }
+.col-algo { width: 40%; }
+
+.text-warn-algo {
+    color: #d35400;
+    font-size: 7.5pt;
+    display: block;
+    margin-top: 2px;
+}
+
+
+/* Para parámetros prohibidos */
+.bg-critical { background-color: #800000; color: #ffffff; }
+
+
+
+
+/* --- CABECERAS DE TABLA PROFESIONALES (Imagen 2) --- */
+.data-table th { 
+    background-color: #1f2937; /* Gris muy oscuro / Azul marino profundo */
+    color: white; 
+    text-align: left; 
+    padding: 10px 12px; 
+    border: none;
+}
+
+/* --- ÍNDICE DE CONTENIDOS LIMPIO --- */
+.toc-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 20px;
+    line-height: 1.6;
+}
+
+.toc-main {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 11.5pt;
+}
+
+.toc-sub {
+    margin-left: 20px;
+    font-size: 10pt;
+}
+
+.toc-list a {
+    text-decoration: none;
+    color: #1f2937; /* Quita el color azul de los links */
+}
+
+/* Los puntitos automáticos de WeasyPrint */
+.toc-list a::after {
+    content: leader('.') target-counter(attr(href), page);
+    color: #7f8c8d;
+    font-weight: normal;
+}
+
+
+
+/* --- CONTEXTO NORMATIVO CRA Y TABLAS DE IMPACTO --- */
+
+.cra-context-box {
+    background-color: #f8fafc;
+    border-left: 4px solid var(--navy-blue);
+    padding: 15px;
+    margin-bottom: 25px;
+}
+
+.cra-context-title {
+    margin-top: 0;
+    color: var(--navy-blue);
+    font-size: 12pt;
+}
+
+.cra-context-text {
+    font-size: 9.5pt;
+    line-height: 1.5;
+    text-align: justify;
+    margin-bottom: 0;
+}
+
+.table-description {
+    font-size: 9pt;
+    margin-bottom: 10px;
+    color: #555555;
+}
+
+/* Utilidades extra para anchos de columna */
+.col-w-25 { width: 25%; }
+.col-w-75 { width: 75%; }
+
+/* Ajuste específico para los puntos de color dentro de las tablas */
+.table-dot {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Ajuste de margen superior para subtítulos seguidos */
+.mt-sm { margin-top: 15px !important; }
+
+
+
+/* --- CONTEXTO NORMATIVO CRA (Texto Plano) --- */
+
+.cra-context-text {
+    text-align: justify;
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #334155;
+    line-height: 1.6;
+}
+

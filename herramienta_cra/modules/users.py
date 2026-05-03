@@ -1,14 +1,19 @@
 import os
+import datetime
 import modules.system as mSystem
 from config.settings import config
+from modules.system import obtener_familia_os
+from core.colores_terminal import print_c, mostrar_subtitulos
+
 
 def info_usuarios_base(verbose, uid_min):
-    print("[+] Recopilando información base de usuarios")
+    print("")
+    print_c("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
     critical_groups = config["users"]["critical_groups"]
     if verbose:
-        print("     [i] Grupos marcados como críticos: "+str(critical_groups))
+        print_c("     [i] Grupos marcados como críticos: "+str(critical_groups))
     
     
     ################# Obtenemos los usuarios que pertenecen a grupos críticos ################################
@@ -22,9 +27,9 @@ def info_usuarios_base(verbose, uid_min):
     usu_grupos_criticos = mSystem.ejecutar_consulta(query)
    
     if verbose:
-        print("     [i] Usuarios detectados en grupos críticos: ")
+        print_c("     [i] Usuarios detectados en grupos críticos: ")
         for u in usu_grupos_criticos:
-            print("         - Usuario: "+str(u.get("username"))+" / Grupo: "+str(u.get("groupname")))
+            print_c("         - Usuario: "+str(u.get("username"))+" / Grupo: "+str(u.get("groupname")))
             
 
     #################### Obtenemos los usuarios relevantes (por uid, grupo o root) ########################
@@ -41,9 +46,9 @@ def info_usuarios_base(verbose, uid_min):
     usuarios = mSystem.ejecutar_consulta(query)
     
     if verbose:
-        print("\n     [i] Información extraída de los usuarios relevantes: ")
+        print_c("\n     [i] Información extraída de los usuarios relevantes: ")
         for u in usuarios:
-            print("         - Usuario: "+str(u.get("username"))+" / uid: "+str(u.get("uid"))+" / shell: "+str(u.get("shell")))
+            print_c("         - Usuario: "+str(u.get("username"))+" / uid: "+str(u.get("uid"))+" / shell: "+str(u.get("shell")))
     
     ##################### Obtenemos las políticas individuales ############################################
     
@@ -57,7 +62,7 @@ def info_usuarios_base(verbose, uid_min):
     datos_shadow = mSystem.ejecutar_consulta(query)
     
     if verbose:
-        print("\n     [i] Políticas de contraseñas extraídos del archivo shadow.")
+        print_c("\n     [i] Políticas de contraseñas extraídos del archivo shadow.")
 
     #################### Unificamos datos ##############################################################
     resultado = juntar_datos(usuarios, usu_grupos_criticos, datos_shadow)
@@ -76,9 +81,7 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
         usuarios_final[nombre] = u
         usuarios_final[nombre]['grupos_criticos'] = []
         usuarios_final[nombre]['politica'] = {}
-            
-    #print(str(usuarios_final)+"\n\n\n") # [DEBUG]
-    
+                
     for registro in usu_grupos_criticos or []:
         nombre = registro.get('username')
         grupo = registro.get('groupname')
@@ -98,9 +101,20 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
     # Metemos para cada usuario la política particular indicada en el shadow
     for registro in datos_shadow or []:
         nombre = registro.get('username')
+        dias_epoch = registro.get('last_change')
+        try:
+            if dias_epoch and int(dias_epoch) > 0:
+                # Sumamos los días a la fecha base 01/01/1970
+                fecha = datetime.date(1970, 1, 1) + datetime.timedelta(days=int(dias_epoch))
+                fecha_formateada = fecha.strftime("%Y-%m-%d")
+            else:
+                fecha_formateada = "Nunca / No definido"
+        except ValueError:
+            fecha_formateada = "Desconocido"
+        
         usuarios_final[nombre]['politica'] = {
             'expire': registro.get('expire'),
-            'last_change': registro.get('last_change'),
+            'last_change': fecha_formateada,
             'max': registro.get('max'),
             'min': registro.get('min'),
             'warning': registro.get('warning')
@@ -122,7 +136,8 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 ##################################################################################################################################
 
 def politicas_passwords(verbose):
-    print("[+] Auditando políticas de contraseñas generales")
+    print("")
+    print_c("[+] Auditando políticas de contraseñas generales")
     politicas = config["users"]["politics"]
     politica_general = {}
     try:
@@ -140,13 +155,13 @@ def politicas_passwords(verbose):
                                 politica_general[clave] = partes[1]
     
     except PermissionError:
-        print(" [ERROR] Permisos insuficientes para leer /etc/login.defs")
+        print_c(" [ERROR] Permisos insuficientes para leer /etc/login.defs")
     
     except FileNotFoundError:
-        print(" [ERROR] No se ha encontrado el archivo /etc/login.defs")
+        print_c(" [ERROR] No se ha encontrado el archivo /etc/login.defs")
     
     except Exception as e:
-        print(" [ERROR] Se ha producido un fallo al tratar de leer /etc/login.defs: "+str(e))
+        print_c(" [ERROR] Se ha producido un fallo al tratar de leer /etc/login.defs: "+str(e))
         
     return politica_general
 
@@ -165,7 +180,8 @@ def politicas_passwords(verbose):
 
 
 def comp_2FA(verbose, usuarios):
-    print("[+] Buscando métodos de doble factor de autentificación")
+    print("")
+    print_c("[+] Buscando métodos de doble factor de autentificación")
     modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
     servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']
@@ -175,55 +191,86 @@ def comp_2FA(verbose, usuarios):
         'mfa_global': False,
         'servicios': {servicio: {'protegido': False, 'detalles': []} for servicio in servicios_pam},
         'ssh_config_valido': False,
+        'ssh_instalado': True,
         'usuarios_token': []
     }
     
+    # Adaptación dinámica de archivos PAM según la familia del SO
+    familia = obtener_familia_os()
+    
+    if familia == "redhat":
+        archivo_pam_base = "/etc/pam.d/system-auth"
+        str_include = "include system-auth"
+    else:
+        # Por defecto tratamos como familia Debian
+        archivo_pam_base = "/etc/pam.d/common-auth"
+        str_include = "@include common-auth"
+    
     #######################################################################################################################
-    modulos_common = comprobar("/etc/pam.d/common-auth", modulos_2fa)
-    if modulos_common:
-        reporte_2fa["mfa_global"] = True
-        if verbose:
-            print("     [i] Se han hayado los siguientes módulos en /etc/pam.d/common-auth:")
-            for m in modulos_common:
-                print("         - "+str(m))
+    if os.path.exists(archivo_pam_base):
+        modulos_common = comprobar(archivo_pam_base, modulos_2fa)
+        if modulos_common:
+            reporte_2fa["mfa_global"] = True
+            if verbose:
+                print_c("     [i] Se han hallado los siguientes módulos en " + archivo_pam_base + ":")
+                for m in modulos_common:
+                    print_c("         - "+str(m))
+    else:
+        modulos_common = []
     
             
     ################# Comprobamos si los módulos especificados en config.yaml usan la 2fa #################################
     for servicio in servicios_pam:
         arch = str("/etc/pam.d/"+str(servicio))
         
-        comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
-        confirmacion = comprobar(arch, comp)
-        if (('@include common-auth' in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+        # Comprobamos si el servicio PAM existe antes de leerlo
+        if os.path.exists(arch):
+            comp = modulos_2fa + [str_include] # Usamos el include correspondiente al sistema
+            confirmacion = comprobar(arch, comp)
+            if ((str_include in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+                reporte_2fa['servicios'][servicio]['protegido'] = True
+                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el include dinámico si usa la config general)
+        else:
+            # Si el servicio no está instalado, se considera seguro (no es un vector de ataque)
             reporte_2fa['servicios'][servicio]['protegido'] = True
-            reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el @include common-auth si usa la config general)
+            reporte_2fa['servicios'][servicio]['detalles'] = ["Servicio no detectado en el sistema"]
+            if verbose:
+                print_c("     [i] El servicio '"+servicio+"' no está instalado en el sistema")
         
     
     ################## Comprobamos si el servicio sshd tiene 2fa ###########################################################
-    comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
-    if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
-        reporte_2fa["ssh_config_valido"] = True
+    # Comprobamos que exista el archivo de configuración del servidor SSH, no solo la carpeta
+    if os.path.exists("/etc/ssh/sshd_config"):
+        reporte_2fa["ssh_instalado"] = True
+        comp_sshd = comprobar("/etc/ssh/sshd_config", params_ssh)
+        if (params_ssh[0] in comp_sshd) and ((params_ssh[1] in comp_sshd) or (params_ssh[2] in comp_sshd)):
+            reporte_2fa["ssh_config_valido"] = True
+            if verbose:
+                print_c("     [i] Configuración de SSH válida para aplicar MFA")
+        elif verbose:
+            print_c("     [X] Configuración de SSH no válida para aplicar MFA")
+    
+    else:
+        reporte_2fa["ssh_instalado"] = False 
+        reporte_2fa["ssh_config_valido"] = True # Mantenemos esto en true para que no reste puntos en el reporte
         if verbose:
-            print("     [i] Configuración de SSH válida para aplicar MFA")
-    elif verbose:
-        print("     [X] Configuración de SSH no válida para aplicar MFA")
+            print_c("     [i] El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA")
     
     
 
     ################# Comprobamos la existencia de los tokens de autentificación en los dir de cada usu #####################
     if verbose:
-        print(f"     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
+        print_c("     [i] Comprobando la existencia de tokens de autentificación en los directorios de los usuarios")
     
     # Cargamos los módulos activos para después comprobar si los tokens pertenecen a uno de los servicios activos 
-    # Lo hacemos en un set para evitar duplicados al reoger los servicios activos de 'detalles'
+    # Lo hacemos en un set para evitar duplicados al recoger los servicios activos de 'detalles'
     modulos_activos = set(modulos_common if modulos_common else [])
     
     # Obtenemos el módulo que protege cada servicio concreto
     for s in reporte_2fa['servicios'].values():
         modulos_activos.update(s['detalles'])
        
-    # A continuación vamos a comprobar para la lista de usuarios cuales tienen un token de 2fa activo en su directorio base (para que lo consideremos activo
-    # tiene que pertenecer a un módulo que a su vez esté activo)
+    # A continuación vamos a comprobar para la lista de usuarios cuales tienen un token de 2fa activo en su directorio base
     for usu in usuarios or []:
         directorio_home = usu.get("directory")
         nombre = usu.get("username")
@@ -243,9 +290,9 @@ def comp_2FA(verbose, usuarios):
                     
                     if verbose:
                         if token_efectivo:
-                            print("         - [OK] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
+                            print_c("         - [Ok] Token '"+token_file+"' configurado y ACTIVO para: "+nombre)
                         else:
-                            print("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
+                            print_c("         - [!] Token '"+token_file+"' hallado en "+nombre+", pero su módulo '"+modulo_asociado+"' no está en PAM.")
                             
     return reporte_2fa
 
@@ -265,9 +312,9 @@ def comprobar(archivo, buscar):
                             resultado.append(clave)
                         
     except FileNotFoundError as e:
-        print(" [ERROR] El archivo "+str(archivo)+" no existe")
+        print_c(" [ERROR] El archivo "+str(archivo)+" no existe")
     except Exception as e:
-        print(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
+        print_c(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
     
     return list(set(resultado)) # Nos evitamos duplicados 
 
@@ -281,8 +328,9 @@ def ESCANER_usuarios(verbose):
         "2FA": {}
     }
     
-    print("\n--- [ FASE 4: AUDITORÍA DE USUARIOS ] ---")
-    print("[+] Iniciando módulo de escaneo de usuarios...")
+    mostrar_subtitulos("Usuarios")
+    print("")
+    print_c("[+] Iniciando módulo de escaneo de usuarios")
     resultados["politicas"] = politicas_passwords(verbose)
     
     #Comprobamos si hay definido un min uid para los usuarios personas en las políticas, de lo contrario ponemos 1000
@@ -295,7 +343,9 @@ def ESCANER_usuarios(verbose):
     
     # Comprobamos si existe 2fa
     resultados["2FA"] = comp_2FA(verbose, resultados["usuarios"])
-    print("[-] Finalizando módulo de escaneo de usuarios")
+    print("")
+    print_c("[-] Finalizando módulo de escaneo de usuarios")
     return resultados
+
 
     

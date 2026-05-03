@@ -116,18 +116,23 @@ hardening:
       - "sha512WithRSAEncryption"
       - "ecdsa-with-SHA256"
       - "ecdsa-with-SHA384"
+    rutas_criticas:
+    # Estas rutas son de ejemplo, generamos un certificado válido y otro peligrosos (para usar la herramienta sustituyalo con la estructura indicada)
+#     - path: "/tmp/cert_malo.pem"
+#       tipo: "publico"
+#       max_permissions: "644"
+#       owner: "root"
+#     - path: "/tmp/clave_mala.pem"
+#       tipo: "privado"
+#       max_permissions: "600"
+#       owner: "root"
 
   encryption: 
     algoritmo: "sha256"
     critical_mounts: ["/", "/home", "/var"]
 
 
-# (Anexo I.1.5 - Resiliencia)
-backups: 
-  comp_crontab: true
-  comp_systemd_timers: true
-  keywords: ["backup", "rsync", "tar", "snapshot", "aws s3", "rclone"]
-
+disponibilidad: ["backup", "rsync", "aws s3", "rclone"]
 
 
 users:
@@ -168,11 +173,31 @@ boot:
   contra_fisica: false
 
   integridad_kernel:
-    white_list: [["P", 0], ["O", 4096]]
+    white_list:
+      - ["P", 1, "Módulo propietario cargado"]
+      - ["I", 2048, "Workaround para bug de firmware aplicado"]
+      - ["O", 4096, "Módulo externo (out-of-tree) cargado"]
+      - ["T", 131072, "Kernel construido con struct randomization"]
+      - ["N", 262144, "Test in-kernel ejecutado"]
 
-    warning_list: [["W", 512], ["C", 1024], ["K", 32768]]
+    warning_list:
+      - ["S", 4, "Kernel en un sistema fuera de especificación"]
+      - ["U", 64, "Contaminación solicitada por aplicación de usuario"]
+      - ["W", 512, "El kernel emitió un warning"]
+      - ["C", 1024, "Se cargó un driver en fase de pruebas (staging)"]
+      - ["K", 32768, "Kernel parcheado en vivo (live patched)"]
+      - ["X", 65536, "Contaminación auxiliar definida por la distro"]
 
-    black_list: [["F", 2], ["R", 8], ["D", 128], ["A", 256], ["E", 8192]]
+    black_list:
+      - ["F", 2, "Módulo forzado a cargar"]
+      - ["R", 8, "Módulo forzado a descargar"]
+      - ["M", 16, "Excepción de chequeo de máquina (MCE) reportada por procesador"]
+      - ["B", 32, "Página de memoria errónea referenciada"]
+      - ["D", 128, "El kernel murió recientemente (OOPS o BUG)"]
+      - ["A", 256, "Tabla ACPI sobrescrita por el usuario"]
+      - ["E", 8192, "Módulo no firmado cargado"]
+      - ["L", 16384, "Ocurrió un soft lockup"]
+      - ["J", 524288, "Operación de depuración mutante usada por usuario"]
     
 
 

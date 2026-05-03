@@ -1,11 +1,13 @@
 import nmap
 import modules.system as mSystem
 from config.settings import config
+from core.colores_terminal import print_c, mostrar_subtitulos
 
 def escaneo_puertos(lista_ips, verbose):
-    print("[+] Iniciando módulo de networking")
+    print("")
+    print_c("[+] Iniciando módulo de networking")
     if verbose:
-        print("     [i] Interfaces a escanear: "+str(lista_ips)+"\n")
+        print_c("     [i] Interfaces a escanear: "+str(lista_ips)+"\n")
     
     nm = nmap.PortScanner()
     white_list = config['network']['white_list']
@@ -15,29 +17,40 @@ def escaneo_puertos(lista_ips, verbose):
     # Bucle principal
     for ip in lista_ips:
         if verbose:
-            print("\n     ----  Escaneando Interfaz: "+ip+"  ----")
+            print("")
+            print_c("---- [ Escaneando Interfaz: "+ip+" ] ----")
 
         try:
             nm.scan(ip, arguments='-p- -sV --version-light --max-retries 1 -T4 --open') 
             
         except nmap.PortScannerError:
-            print("     [ERROR] No se ha encontrado nmap (saltando fase de escaneo de puertos)\n")
+            print_c("     [ERROR] No se ha encontrado nmap (saltando fase de escaneo de puertos)\n")
             return [] # No vamos a poder hacer nada dentro del módulo
             
         except Exception as e:
-            print("     [ERROR] Fallo al ejecutar nmap en "+ip+": "+str(e)+"\n")
+            print_c("     [ERROR] Fallo al ejecutar nmap en "+ip+": "+str(e)+"\n")
             continue 
 
 
         if len(nm.all_hosts()) == 0:
-            print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
+            print_c("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
+            resultados.append({
+                "ip": ip,  
+                "puerto": "-",
+                "protocolo": "-",
+                "servicio": "-",
+                "detalle": "-",
+                "estado": "ACEPTADO",
+                "mensaje": "-",
+                "peligro": "BAJO"
+            })
             continue # Pasamos a la siguiente iteración
 
         mensaje_p_encontrados = False
         for host in nm.all_hosts():
             nombre_host = nm[host].hostname()
             if verbose:
-                print("     Nombre del host: "+nombre_host)
+                print_c("     [i] Nombre del host: "+nombre_host)
             
             for proto in nm[host].all_protocols(): # Con protocolo se refiere a TCP o UDP
                 puertos = nm[host][proto].keys()
@@ -63,7 +76,7 @@ def escaneo_puertos(lista_ips, verbose):
                         mensaje = "PROHIBIDO: " + motivo
                         peligro = "ALTO"
                         if verbose:
-                            print("     [X] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
+                            print_c("     [X] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
 
                     # White list 
                     elif servicio in white_list:
@@ -71,7 +84,7 @@ def escaneo_puertos(lista_ips, verbose):
                         mensaje = "Servicio autorizado en política."
                         peligro = "BAJO"
                         if verbose:
-                            print("     [V] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> OK")
+                            print_c("     [Ok] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> OK")
 
                     # Desconocido
                     else:
@@ -79,7 +92,7 @@ def escaneo_puertos(lista_ips, verbose):
                         mensaje = "Servicio no listado ("+servicio+"), revisar política"
                         peligro = "MEDIO"
                         if verbose:
-                            print("     [!] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
+                            print_c("     [!] "+str(puerto)+"/"+proto+" - "+servicio_completo+" -> "+mensaje)
 
                     resultados.append({
                         "ip": ip,  
@@ -93,14 +106,25 @@ def escaneo_puertos(lista_ips, verbose):
                     })
                     
         if not mensaje_p_encontrados:
-            print("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
+            resultados.append({
+                "ip": ip,  
+                "puerto": "-",
+                "protocolo": "-",
+                "servicio": "-",
+                "detalle": "-",
+                "estado": "ACEPTADO",
+                "mensaje": "-",
+                "peligro": "BAJO"
+            })
+            print_c("     [i] No se ha detectado ningún puerto abierto en la interfaz \n")
 
-    print("\n[-] Finalizando módulo de networking")
+    print("")
+    print_c("[-] Finalizando módulo de networking")
     return resultados
 
 
 def ESCANEO_Networking(verbose):
-    print("--- [ FASE 1: AUDITORÍA DE PUERTOS ] ---")
+    mostrar_subtitulos("Networking")
     resultados = []
     interfaces = mSystem.obtener_interfaces() # Diccionario donde cada clave tiene asociada una lista de diccionarios
     lista_objetivos = []
@@ -114,6 +138,6 @@ def ESCANEO_Networking(verbose):
     if lista_objetivos:
         resultados = escaneo_puertos(lista_objetivos, verbose)
     else:
-        print("[ERROR] No se detectaron IPs para escanear\n")
+        print_c("[ERROR] No se detectaron IPs para escanear\n")
     
     return resultados

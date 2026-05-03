@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Auditoría CRA</title>
+    <link rel="stylesheet" href="styles.css">
+    <style> @page { string-set: report-id "{{ id }}"; } </style>
+</head>
+<body>
+
+    <div class="cover-page">
+        <div class="logo-container">
+            <img src="sealguard-security.png" alt="Logo Sealguard CRA">
+        </div>
+        
+        <h2 class="cover-subtitle">Evaluación de Cumplimiento: Ley de Ciberresiliencia (CRA)</h2>
+        
+        <div class="cover-details">
+            <h3 style="color: #0A2540; margin-top: 0;">Detalles del Escaneo</h3>
+            <table class="data-table" style="margin-top:0; border: none;">
+                <tr><th style="width: 35%;">ID de Auditoría:</th><td>#{{ id }}</td></tr>
+                <tr><th>Fecha de Ejecución:</th><td>{{ fecha }}</td></tr>
+                <tr><th>Hostname Objetivo:</th><td>{{ datos.sistema.hostname | default('Desconocido') }}</td></tr>
+                <tr><th>Motor de Auditoría:</th><td>Python Automated Scanner (UCLM TFG)</td></tr>
+            </table>
+        </div>
+    </div>
+    
+    <div class="toc" style="page-break-after: always; page-break-before: always;">
+        <h1 style="color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Índice de Contenidos</h1>
+        <ul class="toc-list">
+            <li class="toc-main"><a href="#resumen">Resumen Ejecutivo de Cumplimiento</a></li>
+            <li class="toc-main"><a href="#anexo-1">Sección I: Red y Vulnerabilidades</a></li>
+            <li class="toc-sub"><a href="#anexo-1">1. Exposición de Servicios (Networking)</a></li>
+            <li class="toc-sub"><a href="#anexo-1">2. Gestión de Vulnerabilidades (CVEs)</a></li>
+
+            <li class="toc-main"><a href="#anexo-2">Sección II: Identidad y Accesos</a></li>
+            <li class="toc-sub"><a href="#anexo-2">3. Políticas generales de usuarios</a></li>
+            <li class="toc-sub"><a href="#anexo-2">4. Auditoría de Usuarios Relevantes</a></li>
+
+            <li class="toc-main"><a href="#anexo-3">Sección III: Hardening del Sistema</a></li>
+            <li class="toc-sub"><a href="#anexo-3">5. Control de Acceso y Memoria</a></li>
+            <li class="toc-sub"><a href="#anexo-3">6. Seguridad del Servicio SSH</a></li>
+            <li class="toc-sub"><a href="#anexo-3">7. Firewall</a></li>
+            <li class="toc-sub"><a href="#anexo-3">8. Cifrado de Almacenamiento</a></li>
+            <li class="toc-sub"><a href="#anexo-3">9. Binarios Peligrosos (SUID/SGID)</a></li>
+            <li class="toc-sub"><a href="#anexo-3">10. Permisos de Archivos Críticos</a></li>
+            <li class="toc-sub"><a href="#anexo-3">17. Auditoría de Certificados (PKI)</a></li>
+
+            <li class="toc-main"><a href="#anexo-4">Sección IV: Integridad y Arranque</a></li>
+            <li class="toc-sub"><a href="#anexo-4">11. Monitorización de Integridad</a></li>
+            <li class="toc-sub"><a href="#anexo-4">12. Seguridad de Arranque y Firmware</a></li>
+
+            <li class="toc-main"><a href="#anexo-5">Sección V: Disponibilidad y Continuidad</a></li>
+            <li class="toc-sub"><a href="#anexo-5">13. Protecciones contra DDoS</a></li>
+            <li class="toc-sub"><a href="#anexo-5">14. Mecanismos de Backup y Recuperación</a></li>
+        </ul>
+    </div>
+
+    <h1 id="resumen" class="section-title">Resumen Ejecutivo de Cumplimiento</h1>
+    <p class="cra-context-text">
+        Este informe técnico mapea la configuración actual del sistema contra los <strong>Requisitos Esenciales de Ciberseguridad
+         estipulados en el Anexo I</strong> de la propuesta de la CRA de la Unión Europea. El objetivo de esta auditoría automatizada
+         es certificar que el producto con elementos digitales cumple con los principios de <em>Secure by Default</em> y <em>Secure
+         by Design</em> exigidos para su comercialización.
+    </p>
+
+<table class="layout-table">
+    <tr>
+        <td class="layout-col-left">
+            <h2 class="subsection-title mt-0">Información del Sistema</h2>
+            <table class="data-table mt-0">
+                <tr><th class="col-w-35">Hostname</th><td>{{ datos.sistema.hostname }}</td></tr>
+                <tr><th>Sistema OS</th><td>{{ datos.sistema.dist }} {{ datos.sistema.version }}</td></tr>
+                <tr><th>Kernel</th><td>{{ datos.sistema.kernel }}</td></tr>
+                <tr><th>Arquitectura</th><td>{{ datos.sistema.arquitectura }}</td></tr>
+            </table>
+        </td>
+        <td class="layout-col-right">
+            <div class="summary-card">
+                <h3>Estado Global</h3>
+                <div class="donut-container">
+                    <svg width="160" height="160" viewBox="0 0 42 42" class="donut">
+                        <circle cx="21" cy="21" r="15.915" fill="#fff"></circle>
+                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#f1f4f9" stroke-width="6"></circle>
+                        
+                        {% set p_crit = (datos.estadisticas.criticos / datos.estadisticas.total * 100) if datos.estadisticas.total > 0 else 0 %}
+                        {% set p_warn = (datos.estadisticas.advertencias / datos.estadisticas.total * 100) if datos.estadisticas.total > 0 else 0 %}
+                        {% set p_safe = (datos.estadisticas.seguros / datos.estadisticas.total * 100) if datos.estadisticas.total > 0 else 0 %}
+                        
+                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#10b981" stroke-width="6" stroke-dasharray="{{ p_safe }} {{ 100 - p_safe }}" stroke-dashoffset="25"></circle>
+                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#f59e0b" stroke-width="6" stroke-dasharray="{{ p_warn }} {{ 100 - p_warn }}" stroke-dashoffset="{{ 25 - p_safe }}"></circle>
+                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#ef4444" stroke-width="6" stroke-dasharray="{{ p_crit }} {{ 100 - p_crit }}" stroke-dashoffset="{{ 25 - p_safe - p_warn }}"></circle>
+                    </svg>
+                    <div class="donut-center-text">
+                        <span class="donut-number">{{ datos.estadisticas.total }}</span>
+                        <br><span class="donut-label">Controles</span>
+                    </div>
+                </div>
+                <div class="chart-legend-container">
+                    <div class="legend-item"><span class="dot bg-safe"></span> Seguros: <strong>{{ datos.estadisticas.seguros }}</strong></div>
+                    <div class="legend-item"><span class="dot bg-warning"></span> Advertencias: <strong>{{ datos.estadisticas.advertencias }}</strong></div>
+                    <div class="legend-item"><span class="dot bg-danger"></span> Peligros: <strong>{{ datos.estadisticas.criticos }}</strong></div>
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<h2 class="subsection-title mt-sm">Impacto Legal y Normativo</h2>
+    <p class="cra-context-text">
+        La siguiente tabla traduce el estado técnico de los controles evaluados en su impacto frente a la normativa CRA. Cabe destacar que 
+        <strong>la rigidez de estos requisitos y el proceso de certificación (autoevaluación vs. auditoría de terceros) son adaptables al nivel 
+        de riesgo del producto</strong>. Según la CRA, los productos se clasifican en: Categoría por Defecto, Clase I (Críticos) y Clase II (Altamente Críticos)
+        . Un hallazgo en estado de "Peligro" podrá presentar consecuencias en forma de sanciones o de bloqueo de mercado mucho más severas dependiendo de dicha clasificación.
+        Por favor tenga en cuenta que queda fuera de a herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado.
+    </p>
+    <table class="data-table mt-0">
+        <thead>
+            <tr>
+                <th class="col-w-25">Estado</th>
+                <th class="col-w-75">Evaluación de Cumplimiento Normativo (CRA)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="dot bg-safe table-dot"></span> <strong>Seguro</strong></td>
+                <td>El sistema mitiga adecuadamente los riesgos asociados a este control. Cumple de manera satisfactoria con el requisito esencial aplicable.</td>
+            </tr>
+            <tr>
+                <td><span class="dot bg-warning table-dot"></span> <strong>Advertencia</strong></td>
+                <td>Práctica de seguridad mejorable. Aunque actualmente no es un bloqueante legal, podría derivar en un incumplimiento ante nuevas regulaciones o vectores de ataque.</td>
+            </tr>
+            <tr>
+                <td><span class="dot bg-danger table-dot"></span> <strong>Peligro (Crítico)</strong></td>
+                <td><strong>No conformidad severa.</strong> Existe una violación directa del principio de "Seguridad por Defecto" que expone el sistema. Representa un bloqueo crítico para la certificación del producto.</td>
+            </tr>
+        </tbody>
+    </table>
+
+
+<h2 class="subsection-title" style="margin-top: 20px;">Auditoría por Módulos</h2>
+<table class="data-table mt-0">
+    <thead>
+        <tr>
+            <th>Módulo de Evaluación</th>
+            <th class="text-center" style="width: 150px;">Estado General</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mod in datos.estadisticas.resumen_tabla %}
+        <tr>
+            <td><strong>{{ mod.nombre }}</strong></td>
+            <td class="text-center">
+                <span class="badge {{ mod.clase }}">{{ mod.estado }}</span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!--        Anexo 1         -->
+    <h1 id="anexo-1" class="section-title">Sección I: Red y Vulnerabilidades</h1>
+    
+    <h2 class="subsection-title">1. Exposición de Servicios</h2>
+    <!-- Explicación normativa -->
+        <p class="cra-context-text">
+            El <strong>Anexo I, Parte I, Requisitos 2(b) y 2(j) de la CRA</strong> exige que los productos con elementos digitales se comercialicen con una
+            "configuración segura por defecto" y estén diseñados para "limitar las superficies de ataque, incluidas las interfaces externas". 
+            Esto obliga a que cualquier puerto o servicio de red que no sea estrictamente necesario para el funcionamiento esencial del dispositivo deba 
+            estar deshabilitado. La presencia de servicios expuestos no autorizados (marcados como PROHIBIDO) representa una violación directa de este 
+            principio.        
+        </p>
+    {% if datos.puertos | length > 0 %}
+        {% for grupo in datos.puertos | groupby('ip') %}
+            
+            <div class="interface-header">
+                <strong>Dirección IP / Interfaz:</strong> {{ grupo.grouper }}
+            </div>
+            
+            <table class="data-table table-interface">
+                <tr>
+                    <th style="width: 15%;">Puerto</th>
+                    <th style="width: 30%;">Servicio y Detalles</th>
+                    <th style="width: 15%;">Estado</th>
+                    <th style="width: 25%;">Motivo</th>
+                    <th style="width: 15%;">Peligro</th>
+                </tr>
+                
+                {% for puerto in grupo.list %}
+                <tr>
+                    <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
+                    <td>{{ puerto.detalle }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.estado }}
+                        </span>
+                    </td>
+                    
+                    <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
+                    
+                    <td>
+                        <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
+                            {{ puerto.peligro }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            
+        {% endfor %}
+    {% else %}
+        <div class="success-box">
+            <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
+        </div>
+    {% endif %}
+
+<h2 class="subsection-title">2. Gestión de Vulnerabilidades</h2>
+
+    <p class="cra-context-text">
+        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>«sin vulnerabilidades aprovechables conocidas»</em>. Adicionalmente, la <strong>Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto y a abordar y subsanar dichas vulnerabilidades <em>«sin demora»</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo base supone un incumplimiento directo de estos mandatos de ciberresiliencia.
+    </p>
+    <div class="info-box">Total de paquetes escaneados: {{ datos.paquetes.apt + datos.paquetes.pip }} (APT y PIP).</div>
+    
+    <table class="data-table">
+        <tr>
+            <th class="col-w-20">Paquete Afectado</th>
+            <th class="col-w-15">Versión</th>
+            <th class="col-w-15">Entorno</th>
+            <th class="col-w-50">Vulnerabilidades (CVE y Score CVSS)</th>
+        </tr>
+        {% for vuln in datos.vulns %}
+        <tr>
+            <td><strong>{{ vuln.paquete }}</strong></td>
+            <td>{{ vuln.version }}</td>
+            <td>{{ vuln.tipo }}</td>
+            <td>
+                <span class="badge bg-danger mb-sm">{{ vuln.cantidad }} CVEs Detectados</span><br>
+                
+                <div class="vuln-list-container">
+                    {% for cve in vuln.cves[:5] %}
+                        • <strong>{{ cve.id }}</strong> 
+                        
+                        <span class="{% if cve.score >= 9.0 %}cvss-critical{% elif cve.score >= 7.0 %}cvss-high{% else %}cvss-medium{% endif %}">
+                            (CVSS: {{ cve.score }})
+                        </span><br>
+                    {% endfor %}
+                    
+                    {% if vuln.cves | length > 5 %}
+                        <span class="vuln-omitted-text">
+                            ...y {{ vuln.cves | length - 5 }} vulnerabilidades más omitidas.
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center">El sistema se encuentra parcheado. No hay vulnerabilidades de alto riesgo.</td></tr>
+        {% endfor %}
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!--        Anexo 2         -->
+    <h1 id="anexo-2" class="section-title">Sección II: Identidad y Accesos</h1>
+    <h2 class="subsection-title">3. Políticas generales de usuarios</h2>
+    <!-- Normativa -->
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(d) de la CRA</strong> establece la obligatoriedad de proteger el producto frente a 
+        accesos no autorizados mediante mecanismos de control de identidad adecuados. En el nivel del sistema operativo base, esto 
+        exige la configuración estricta de las políticas de contraseñas (como su caducidad y complejidad en <code>login.defs</code>) 
+        y la correcta gestión del ciclo de vida de los usuarios. Una configuración laxa en estos parámetros contraviene el principio 
+        de seguridad por defecto de la normativa, facilitando ataques de fuerza bruta o escalada de privilegios.
+    </p>
+    
+    <table class="data-table">
+        <tr>
+            <th class="col-w-50">Directiva de Seguridad</th>
+            <th class="col-w-50">Valor Configurado</th>
+        </tr>
+        
+        {% for clave, valor in datos.politicas_contra.items() %}
+        <tr>
+            <td><strong class="font-mono">{{ clave }}</strong></td>
+            <td>{{ valor }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2" class="text-center">No se han podido extraer las políticas de /etc/login.defs</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+
+    <h2 class="subsection-title">4. Auditoría de Usuarios Relevantes</h2>
+    
+    <table class="data-table text-xs">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>UID</th>
+                <th>Descripción</th>
+                <th class="col-path">Directorio</th>
+                <th>Shell</th>
+                <th>Grupos Críticos</th>
+                <th>GID</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usu in datos.usuarios %}
+            <tr>
+                <td><strong>{{ usu.username }}</strong></td>
+                <td>{{ usu.uid }}</td>
+                <td class="col-desc">{{ usu.description | default('-') }}</td>
+                <td class="col-path">{{ usu.directory }}</td>
+                <td><code>{{ usu.shell }}</code></td>
+                <td>
+                    {% for grupo in usu.grupos_criticos %}
+                        <span class="badge-group">{{ grupo }}</span>
+                    {% else %}
+                        <span style="color: #999;">Ninguno</span>
+                    {% endfor %}
+                </td>
+                <td>{{ usu.gid }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Políticas individuales</h3>
+    <p class="text-xs" style="margin-bottom: 10px;">Valores extraídos del archivo <code>/etc/shadow</code> para los usuarios listados anteriormente.</p>
+
+    <table class="data-table text-xs">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Expire</th>
+                <th>Max</th>
+                <th>Min</th>
+                <th>Warning</th>
+                <th>Last Change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usu in datos.usuarios %}
+            <tr>
+                <td><strong>{{ usu.username }}</strong></td>
+                <td>{{ usu.politica.expire if usu.politica.expire != -1 else 'Nunca' }}</td>
+                <td>{{ usu.politica.max if usu.politica.max != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.min if usu.politica.min != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.warning if usu.politica.warning != -1 else 'No def.' }}</td>
+                <td>{{ usu.politica.last_change | default('Desconocido') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    
+    <h2 class="subsection-title">5. Autenticación Multifactor</h2>
+    <!-- Contexto normativo -->
+    <p class="cra-context-text">
+        En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA (Requisito 2.d)</strong>, 
+        la implementación de Autenticación Multifactor (MFA) constituye un control técnico fundamental. Su ausencia en vías de acceso
+         críticas, como la administración remota, representa un riesgo severo de suplantación de identidad que comprometería la 
+         validación del sistema como "seguro por defecto" exigido por la normativa europea.
+    </p>
+
+    {% if datos['2FA'].mfa_global %}
+        <div class="success-box"><strong>MFA Global (PAM):</strong> Se han detectado módulos de doble factor en la configuración base del sistema (common-auth).</div>
+    {% else %}
+        <div class="alert-box"><strong>MFA Global (PAM):</strong> No se ha detectado una configuración de segundo factor activa a nivel de sistema.</div>
+    {% endif %}
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Análisis de Servicios Protegidos</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Servicio / Aplicación</th>
+                <th class="col-mfa-status">Estado MFA</th>
+                <th class="col-mfa-details">Detalles de Configuración</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for servicio, info in datos['2FA'].servicios.items() %}
+            <tr>
+                <td><strong>{{ servicio }}</strong></td>
+                <td class="text-center">
+                    {% if "Servicio no detectado en el sistema" in info.detalles %}
+                        <span class="badge bg-secondary">NO ENCONTRADO</span>
+                    {% else %}
+                        <span class="badge {% if info.protegido %}bg-safe{% else %}bg-danger{% endif %}">
+                            {% if info.protegido %}PROTEGIDO{% else %}VULNERABLE{% endif %}
+                        </span>
+                    {% endif %}
+                </td>
+                <td>
+                    <ul class="table-details-list">
+                        {% for detalle in info.detalles %}
+                            <li>{{ detalle }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Requisitos de Infraestructura SSH</h3>
+    
+    {# Obtenemos la info de sshd de forma segura con .get() #}
+    {% set info_sshd = datos['2FA'].servicios.get('sshd') %}
+    
+    {# 1º Comprobamos si directamente el servicio no existe #}
+    {% if info_sshd and "Servicio no detectado en el sistema" in info_sshd.detalles %}
+        <div class="info-box"><strong>Configuración SSH:</strong> El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA.</div>
+        
+    {# 2º Si existe, evaluamos si la configuración es válida #}
+    {% elif datos['2FA'].ssh_config_valido %}
+        <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
+        
+    {# 3º Si existe pero está mal configurado #}
+    {% else %}
+        <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
+    {% endif %}
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">      Auditoría de Tokens de Usuario</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Token Detectado</th>
+                <th class="col-token-status">Estado Efectivo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ut in datos['2FA'].usuarios_token %}
+            <tr>
+                <td><strong>{{ ut.usuario }}</strong></td>
+                <td><code class="font-mono">{{ ut.token }}</code></td>
+                <td class="text-center">
+                    <span class="badge {% if ut.efectivo %}bg-safe{% else %}bg-warning{% endif %}">
+                        {% if ut.efectivo %}ACTIVO{% else %}INCOMPLETO{% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" class="text-center">No se han encontrado tokens 2FA en los directorios personales.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!--        Anexo 3         -->
+    <h1 id="anexo-3" class="section-title">Sección III: Hardening del Sistema</h1>
+    
+    <p class="cra-context-text">
+        La <strong>Ley de Ciberresiliencia (CRA)</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos se comercializarán con una «configuración segura por defecto». El proceso de bastionado (hardening) evaluado en esta sección es el mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la obligación de salvaguardar la integridad de los programas frente a manipulaciones <strong>(Requisito 2.f)</strong> y aplicar mecanismos para mitigar el aprovechamiento de vulnerabilidades <strong>(Requisito 2.k)</strong>.
+    </p>
+    
+    <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
+    <p class="cra-context-text">
+        La implementación de sistemas de Control de Acceso Obligatorio (MAC) y la randomización de memoria (ASLR) permiten al producto cumplir con el <strong>Requisito 2(k) de la CRA</strong>, el cual exige diseñar los sistemas provistos de «mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades», limitando el impacto de un posible incidente.
+    </p>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 20%;">Mecanismo MAC</th>
+                <th style="width: 20%;" class="text-center">Estado del Servicio</th>
+                <th style="width: 30%;" class="text-center">Perfiles Estrictos (Enforce)</th>
+                <th style="width: 30%;" class="text-center">Perfiles en Observación (Complain)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>AppArmor</strong></td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        <span class="badge bg-info">DETECTADO</span>
+                    {% else %}
+                        <span class="badge bg-secondary">NO INSTALADO</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        {% if datos.hardening.mac.apparmor.enforce > 0 %}
+                            <span class="text-safe-bold">{{ datos.hardening.mac.apparmor.enforce }} Activos</span>
+                        {% else %}
+                            <span class="text-danger-bold">0 Activos</span>
+                        {% endif %}
+                    {% else %}<span class="text-muted">-</span>{% endif %}
+                </td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.apparmor.activo %}
+                        {% if datos.hardening.mac.apparmor.complain > 0 %}
+                            <span class="text-warn-bold">{{ datos.hardening.mac.apparmor.complain }} en Observación</span>
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
+                    {% else %}<span class="text-muted">-</span>{% endif %}
+                </td>
+            </tr>
+            
+            <tr>
+                <td><strong>SELinux</strong></td>
+                <td class="text-center">
+                    {% if datos.hardening.mac.selinux.activo %}
+                        <span class="badge bg-info">DETECTADO</span>
+                    {% else %}
+                        <span class="badge bg-secondary">NO INSTALADO</span>
+                    {% endif %}
+                </td>
+                <td colspan="2" class="text-center">
+                    {% if datos.hardening.mac.selinux.activo %}
+                        {% if datos.hardening.mac.selinux.modo == 'Enforcing' %}
+                            <span class="text-safe-bold">Modo Estricto (Enforcing)</span>
+                        {% else %}
+                            <span class="text-warn-bold">Modo Aviso (Permissive)</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Randomización del Espacio de Direcciones (ASLR)</h3>
+    
+    {% if datos.hardening.kernel_aslr.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Protección ASLR Activa:</strong> El Kernel tiene activada la randomización de memoria en el nivel óptimo (Nivel {{ datos.hardening.kernel_aslr.valor }}). 
+            Esta configuración dificulta que un atacante prediga las direcciones de memoria de las librerías y la pila, mitigando ataques de explotación como desbordamientos de búfer.
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Riesgo en Protección ASLR:</strong> La randomización de memoria está desactivada o configurada en un nivel insuficiente (Nivel {{ datos.hardening.kernel_aslr.valor }}). 
+            Sin una randomización adecuada, las direcciones de memoria son estáticas, lo que facilita enormemente el éxito de exploits de tipo <em>Return-Oriented Programming</em> (ROP).
+        </div>
+    {% endif %}
+    
+    <h2 class="subsection-title">7. Auditoría de Certificados y Claves</h2>
+    
+    <p class="cra-context-text">
+        La gestión adecuada de la Infraestructura de Clave Pública y de las claves criptográficas es esencial para cumplir con el <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong>, que exige proteger la confidencialidad de los datos tratados y transmitidos (cifrado en tránsito). Además, la validez y protección de estos archivos en el sistema fundamentan los mecanismos de autenticación seguros requeridos por el <strong>Requisito 2(d)</strong>. Un certificado caducado o una clave privada con permisos excesivos comprometen directamente la cadena de confianza y la seguridad del producto.
+    </p>
+    
+    {% if datos.hardening.certificados.estado == 'SEGURO' and not datos.hardening.certificados.tabla_certificados %}
+        <div class="info-box"><strong>Infraestructura de Claves:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
+    {% else %}
+        <table class="data-table text-xs table-fixed">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Ruta del Archivo</th>
+                    <th class="text-center" style="width: 15%;">Tipo</th>
+                    <th class="text-center" style="width: 15%;">Estado</th>
+                    <th style="width: 35%;">Análisis de Riesgos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cert in datos.hardening.certificados.tabla_certificados %}
+                <tr>
+                    <td class="col-path"><strong>{{ cert.ruta }}</strong></td>
+                    <td class="text-center">{{ cert.tipo }}</td>
+                    <td class="text-center">
+                        {% if cert.estado_color == 'OK' %}
+                            <span class="badge bg-safe">SEGURO</span>
+                        {% elif cert.estado_color == 'ADVERTENCIA' %}
+                            <span class="badge bg-warning">ATENCIÓN</span>
+                        {% elif cert.estado_color == 'NO ENCONTRADO' %}
+                            <span class="badge bg-secondary">MISSING</span>
+                        {% else %}
+                            <span class="badge bg-danger">VULNERABLE</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if cert.problemas %}
+                            <ul class="table-details-list">
+                                {% for prob in cert.problemas %}
+                                    <li>{{ prob }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span>Parámetros criptográficos y permisos de sistema correctos.</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <h2 class="subsection-title" style="margin-top: 25px;">8. Seguridad del Servicio SSH</h2>
+    {% if datos.hardening.ssh.estado == 'SEGURO' and not datos.hardening.ssh.tabla_ssh %}
+        <div class="info-box"><strong>Servicio Inactivo:</strong> {{ datos.hardening.ssh.detalles }}</div>
+    {% else %}
+        <table class="data-table text-xs table-fixed">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Directiva SSH</th>
+                    <th class="text-center" style="width: 15%;">Estado</th>
+                    <th style="width: 60%;">Detalle de Configuración</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for param in datos.hardening.ssh.tabla_ssh %}
+                <tr>
+                    <td><code>{{ param.param }}</code></td>
+                    <td class="text-center">
+                        {% if param.estado == 'OK' %}
+                            <span class="badge bg-safe">OK</span>
+                        {% elif param.estado == 'FALTA' %}
+                            <span class="badge bg-warning">NO DEFINIDO</span>
+                        {% else %}
+                            <span class="badge bg-danger">VULNERABLE</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ param.desc }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <h2 class="subsection-title">9. Firewall</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Requisito 2(j) de la CRA</strong> obliga de manera explícita a que los productos estén diseñados para «limitar las superficies de ataque, incluidas las interfaces externas». La presencia y correcta configuración de un cortafuegos (Firewall) a nivel de kernel es el control técnico idóneo para validar este requerimiento, asegurando que el equipo aplique políticas restrictivas frente a conexiones no autorizadas.
+    </p>
+    
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Gestores de Firewall</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Servicio</th>
+                <th class="text-center" style="width: 30%;">Estado Actual</th>
+                <th class="text-center" style="width: 30%;">Persistencia (Arranque)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for srv in datos.hardening.firewall.servicios %}
+            <tr>
+                <td><strong>{{ srv.nombre }}</strong></td>
+                <td class="text-center">
+                    <span class="badge {% if srv.activo %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'ACTIVO' if srv.activo else 'INACTIVO' }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge {% if srv.arranque == 'enabled' %}bg-info{% else %}bg-warning{% endif %}">
+                        {{ srv.arranque | upper }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-top: 20px; margin-bottom: 8px;">
+       Filtrado de Paquetes en el Kernel ({{ datos.hardening.firewall.kernel.tipo_filtro }})
+    </h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 35%;">Métrica de Red</th>
+                <th class="text-center" style="width: 25%;">Estado / Valor</th>
+                <th class="text-center" style="width: 40%;">Evaluación de Riesgo</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Reglas de Bloqueo Detectadas</td>
+                <td class="text-center"><strong>{{ datos.hardening.firewall.kernel.reglas_bloqueo }}</strong></td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.reglas_bloqueo > 0 %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'CORRECTO' if datos.hardening.firewall.kernel.reglas_bloqueo > 0 else 'SISTEMA EXPUESTO' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Política por defecto (INPUT)</td>
+                <td class="text-center">{{ 'ACCEPT' if datos.hardening.firewall.kernel.politica_accept else 'DROP / REJECT' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.politica_accept %}bg-danger{% else %}bg-safe{% endif %}">
+                        {{ 'PELIGROSO (PERMISIVO)' if datos.hardening.firewall.kernel.politica_accept else 'SEGURO (RESTRICTIVO)' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Filtrado de Salida (OUTPUT)</td>
+                <td class="text-center">{{ 'Activo' if datos.hardening.firewall.kernel.bloqueo_output else 'No detectado' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.bloqueo_output %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ 'OK' if datos.hardening.firewall.kernel.bloqueo_output else 'ADVERTENCIA' }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td>Filtrado de Reenvío (FORWARD)</td>
+                <td class="text-center">{{ 'Activo' if datos.hardening.firewall.kernel.bloqueo_forward else 'No detectado' }}</td>
+                <td class="text-center">
+                    <span class="badge {% if datos.hardening.firewall.kernel.bloqueo_forward %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ 'OK' if datos.hardening.firewall.kernel.bloqueo_forward else 'ADVERTENCIA' }}
+                    </span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    {% if datos.hardening.firewall.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Sistema Protegido:</strong> El tráfico de red está siendo filtrado mediante reglas activas.
+            {% if datos.hardening.firewall.alertas %}
+                <br><span style="font-size: 8pt; color: #555;">Observaciones: {{ datos.hardening.firewall.alertas | join(', ') }}.</span>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Sistema Expuesto:</strong> No se han detectado reglas de filtrado activas. El tráfico de red no está siendo supervisado y el sistema es vulnerable a conexiones externas no autorizadas.
+        </div>
+    {% endif %}
+
+<h2 class="subsection-title">10. Cifrado de Almacenamiento</h2>
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong> es concluyente al requerir que los productos «protegerán la confidencialidad de los datos [...] mediante, por ejemplo, el cifrado de los datos en reposo». La ausencia de cifrado (como LUKS en entornos Linux) en particiones que alberguen información sensible supone una vulneración directa de este mandato legal, exponiendo la configuración y la información ante el acceso físico directo o el robo del dispositivo.
+    </p>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Análisis de Particiones Físicas</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th class="col-disk">Dispositivo</th>
+                <th class="col-mount">Montaje</th>
+                <th class="col-enc-status">Estado Cifrado</th>
+                <th class="col-algo">Especificaciones de Cifrado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for part in datos.hardening.cifrado.lista_particiones %}
+            <tr>
+                <td><strong>{{ part.dispositivo }}</strong></td>
+                <td><code>{{ part.ruta }}</code></td>
+                <td class="text-center">
+                    <span class="badge {% if part.cifrada %}bg-safe{% else %}bg-danger{% endif %}">
+                        {{ 'CIFRADO' if part.cifrada else 'SIN CIFRAR' }}
+                    </span>
+                </td>
+                <td>
+                    {% if part.cifrada %}
+                        <span class="font-mono">{{ part.algoritmo }}</span>
+                        {% if part.advertencia %}
+                            <span class="text-warn-algo">Algoritmo no recomendado según política</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">N/A</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if datos.hardening.cifrado.estado == 'SEGURO' %}
+        <div class="success-box">
+            <strong>Protección Completa:</strong> Todos los puntos de montaje críticos identificados en el sistema ({{ datos.hardening.cifrado.criticos_encontrados | join(', ') }}) se encuentran debidamente cifrados. El riesgo de acceso físico a datos en reposo está mitigado conforme a la CRA.
+        </div>
+    {% else %}
+        <div class="alert-box">
+            <strong>Brecha de Seguridad Detectada:</strong> Se han localizado puntos de montaje críticos sin cifrado de disco activo.
+            <br>
+            <strong>Faltantes:</strong> 
+            {% if datos.hardening.cifrado.criticos_faltantes %}
+                <span class="text-danger-bold">{{ datos.hardening.cifrado.criticos_faltantes | join(', ') }}</span>
+            {% else %}
+                <span class="text-danger-bold">No se detectó cifrado en ninguna partición crítica.</span>
+            {% endif %}
+            <p style="margin-top: 8px; font-size: 9pt;">Se recomienda encarecidamente el uso de LUKS para proteger la confidencialidad de la información ante la pérdida o robo físico del equipo.</p>
+        </div>
+    {% endif %}
+
+    <h2 class="subsection-title">11. Binarios con Permisos Peligrosos (SUID / SGID)</h2>
+
+    <p class="cra-context-text">
+        En virtud del <strong>Requisito 2(f) de la CRA</strong>, los dispositivos deben proteger «los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada». Auditar los binarios con permisos elevados (SUID/SGID) y los privilegios asignados a los archivos de configuración core (como <code>/etc/shadow</code> o <code>/etc/sudoers</code>) es vital. Identificar y reportar permisos excesivos garantiza la verificación de la resistencia del sistema frente a técnicas locales de escalada de privilegios y persistencia.
+    </p>
+
+    {% if datos.hardening.suid_sgid.peligrosos|length == 0 %}
+        <div class="success-box">
+            <strong>Protección Activa:</strong> Se han auditado {{ datos.hardening.suid_sgid.seguros }} procesos con SUID/SGID activos. Ninguno de ellos se encuentra en directorios críticos ni posee permisos excesivos.
+        </div>
+    {% else %}
+        <div class="alert-box" style="margin-bottom: 10px;">
+            <strong>Alerta de Escalada de Privilegios:</strong> Se han detectado binarios SUID/SGID que podrían ser explotados por un atacante local para obtener permisos de root.
+        </div>
+        <table class="data-table text-xs table-fixed">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Ruta del Binario</th>
+                    <th class="text-center" style="width: 15%;">Dueño / Grupo</th>
+                    <th class="text-center" style="width: 15%;">Permisos</th>
+                    <th style="width: 35%;">Motivo de Riesgo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for binario in datos.hardening.suid_sgid.peligrosos %}
+                <tr>
+                    <td class="col-path"><strong>{{ binario.path }}</strong></td>
+                    <td class="text-center">{{ binario.username }} / {{ binario.groupname }}</td>
+                    <td class="text-center font-mono">{{ binario.mode }}</td>
+                    <td>{{ binario.motivo }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+<h2 class="subsection-title">12. Permisos de Archivos Críticos</h2>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Ruta del Archivo</th>
+                <th class="text-center" style="width: 15%;">Estado</th>
+                <th style="width: 55%;">Problemas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for archivo in datos.hardening.archivos_criticos %}
+            <tr>
+                <td class="col-path"><strong>{{ archivo.archivo }}</strong></td>
+                <td class="text-center">
+                    {% if archivo.estado == 'SEGURO' %}
+                        <span class="badge bg-safe">OK</span>
+                    {% elif archivo.estado == 'NO ENCONTRADO' %}
+                        <span class="badge bg-warning">MISSING</span>
+                    {% else %}
+                        <span class="badge bg-danger">RIESGO</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if archivo.problemas %}
+                        <ul class="table-details-list">
+                            {% if archivo.problemas is string %}
+                                <li>{{ archivo.problemas }}</li>
+                            {% else %}
+                                {% for prob in archivo.problemas %}
+                                    <li>{{ prob }}</li>
+                                {% endfor %}
+                            {% endif %}
+                        </ul>
+                    {% else %}
+                        <span class="text-muted">Permisos y propietario configurados correctamente.</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!--        ANEXO 4         -->
+    <h1 id="anexo-4" class="section-title">Sección IV: Integridad y Arranque</h1>
+
+    <h2 class="subsection-title">13. Monitorización de Integridad</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(f) de la CRA</strong> exige que los productos protejan «la integridad de los datos 
+        [...], los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada [...] e 
+        informarán sobre los casos de corrupción de datos». La monitorización continua de archivos críticos base es el control 
+        técnico directo para satisfacer esta obligación, permitiendo detectar de forma temprana troyanizaciones, inyecciones de 
+        código o alteraciones indebidas en la configuración estructural del sistema.
+    </p>
+    
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 45%;">Archivo Monitoreado</th>
+                <th class="text-center" style="width: 25%;">Estado de Integridad</th>
+                <th style="width: 30%;">Parámetros Modificados</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for archivo in datos.integridad %}
+            <tr>
+                <td class="col-path"><strong>{{ archivo.archivo }}</strong></td>
+                <td class="text-center">
+                    {% if archivo.estado == 'INTACTO' %}
+                        <span class="badge bg-safe">INTACTO</span>
+                    {% elif archivo.estado == 'NO_RASTREADO' %}
+                        <span class="badge bg-warning">NUEVO</span>
+                    {% elif archivo.estado == 'INACCESIBLE / BORRADO' %}
+                        <span class="badge bg-danger">BORRADO</span>
+                    {% else %}
+                        <span class="badge bg-danger">{{ archivo.estado }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if archivo.detalles_cambio and archivo.detalles_cambio|length > 0 %}
+                        <ul class="table-details-list">
+                            {% for cambio in archivo.detalles_cambio %}
+                                <li>{{ cambio }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <span class="text-muted">---</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted">No se detectó un archivo baseline (history/escaneo_baseline.json).</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <h2 class="subsection-title">14. Seguridad de Arranque y Firmware</h2>
+
+    <p class="cra-context-text">
+        La cadena de confianza en el arranque es vital para garantizar la ciberresiliencia del producto desde su encendido. Los 
+        <strong>Requisitos 2(b) (Configuración segura por defecto) y 2(f) (Integridad) de la CRA</strong> demandan que el sistema 
+        base no sea susceptible a inyecciones de código a bajo nivel. Validar el uso de <em>Secure Boot</em>, auditar la 
+        contaminación del kernel (<em>Tainted State</em>) y asegurar los parámetros del gestor de arranque previenen la ejecución 
+        de firmware o módulos no autorizados antes de que las políticas de seguridad del sistema operativo puedan entrar en vigor.
+    </p>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Verificación de Secure Boot</h3>
+    {% if datos.boot.integridad.sb_estado == 'SEGURO' %}
+        <div class="success-box"><strong>Firma de Arranque:</strong> {{ datos.boot.integridad.sb_msg }}</div>
+    {% elif datos.boot.integridad.sb_estado == 'ADVERTENCIA' %}
+        <div class="info-box" style="border-left-color: #f39c12;"><strong>Firma de Arranque:</strong> {{ datos.boot.integridad.sb_msg }}</div>
+    {% else %}
+        <div class="alert-box"><strong>Firma de Arranque:</strong> {{ datos.boot.integridad.sb_msg }}</div>
+    {% endif %}
+
+<h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px; margin-top: 20px;">Contaminación del Kernel (Tainted State)</h3>
+    
+    {% if datos.boot.integridad.tainted_flags %}
+        <table class="data-table text-xs table-fixed">
+            <thead>
+                <tr>
+                    <th class="text-center" style="width: 15%;">Flag Bit</th>
+                    <th style="width: 65%;">Descripción de la Contaminación</th>
+                    <th class="text-center" style="width: 20%;">Peligrosidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for taint in datos.boot.integridad.tainted_flags %}
+                <tr>
+                    <td class="text-center"><strong>[{{ taint.flag }}]</strong></td>
+                    <td>{{ taint.desc }}</td>
+                    <td class="text-center">
+                        {% if taint.riesgo == 'INFO' %}
+                            <span class="badge bg-info">INFO</span>
+                        {% elif taint.riesgo == 'MEDIO' %}
+                            <span class="badge bg-warning">MEDIO</span>
+                        {% else %}
+                            <span class="badge bg-danger">CRÍTICO</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% elif datos.boot.integridad.kernel_seguro %}
+        <div class="success-box" style="margin-bottom: 25px;"><strong>Integridad del Kernel:</strong> El kernel no ha sido alterado y todas las flags del proceso de boot están limpias.</div>
+    {% else %}
+        <div class="alert-box"><strong>Error de Lectura:</strong> No se ha logrado obtener el valor "tainted" del kernel.</div>
+    {% endif %}
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px; margin-top: 20px;">Parámetros del Kernel en Tiempo de Arranque</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Parámetro Monitorizado</th>
+                <th class="text-center" style="width: 20%;">Estado</th>
+                <th style="width: 40%;">Diagnóstico</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for param in datos.boot.parametros.parametros_tabla %}
+            <tr>
+                <td class="col-path"><code>{{ param.param }}</code></td>
+                <td class="text-center">
+                    {% if param.estado == 'OK' %}
+                        <span class="badge bg-safe">OK</span>
+                    {% elif param.estado == 'ADVERTENCIA' %}
+                        <span class="badge bg-warning">ADVERTENCIA</span>
+                    {% elif param.estado == 'PROHIBIDO' %}
+                        <span class="badge bg-critical">PROHIBIDO</span>
+                    {% else %}
+                        <span class="badge bg-danger">{{ param.estado }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ param.desc }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted">No se ha podido leer el archivo GRUB.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px; margin-top: 20px;">Seguridad del Gestor de Arranque (GRUB)</h3>
+    
+    {% if datos.boot.grub.archivo_estado == 'SEGURO' %}
+        <div class="success-box" style="margin-bottom: 10px;"><strong>Permisos de Configuración:</strong> {{ datos.boot.grub.archivo_msg }}</div>
+    {% else %}
+        <div class="alert-box" style="margin-bottom: 10px;"><strong>Riesgo en Configuración:</strong> {{ datos.boot.grub.archivo_msg }}</div>
+    {% endif %}
+
+    {% if datos.boot.grub.pass_estado == 'SEGURO' %}
+        <div class="success-box"><strong>Protección Física:</strong> {{ datos.boot.grub.pass_msg }}</div>
+    {% else %}
+        <div class="info-box" style="border-left-color: #f39c12; background-color: #fcf8e3;">
+            <strong>Protección Física:</strong> {{ datos.boot.grub.pass_msg }}
+        </div>
+    {% endif %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!--        Anexo 5         -->
+    <h1 id="anexo-5" class="section-title">Sección V: Disponibilidad y Continuidad</h1>
+
+    <h2 class="subsection-title">15. Protecciones contra DDoS</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(h) de la CRA</strong> exige explícitamente que los productos con elementos digitales 
+        protejan «la disponibilidad de funciones esenciales y básicas, también tras un incidente, también mediante medidas de 
+        resiliencia frente a ataques de denegación de servicio y paliativas de sus efectos». La configuración de límites estrictos 
+        de asignación de recursos del sistema (previniendo el agotamiento por procesos descontrolados) y el bastionado de la pila de 
+        red en el kernel (como la activación de SYN Cookies) son controles obligatorios para acreditar la capacidad del producto para 
+        resistir intentos de saturación intencionados.
+    </p>
+    
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 15%;">Parámetro</th>
+                <th class="text-center" style="width: 15%;">Estado</th>
+                <th class="text-center" style="width: 15%;">Valor Máximo</th>
+                <th style="width: 25%;">Archivo de Configuración</th>
+                <th style="width: 30%;">Riesgo Mitigado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for limite in datos.disponibilidad.limites_recursos.tabla_limites %}
+            <tr>
+                <td><strong>{{ limite.param }}</strong></td>
+                <td class="text-center">
+                    {% if limite.encontrado %}
+                        <span class="badge bg-safe">OK</span>
+                    {% else %}
+                        <span class="badge bg-danger">NO DEFINIDO</span>
+                    {% endif %}
+                </td>
+                <td class="text-center font-mono">{{ limite.valor }}</td>
+                <td class="col-path text-muted">{{ limite.archivo }}</td>
+                <td>{{ limite.riesgo }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if datos.disponibilidad.limites_recursos.ningun_limite %}
+        <div class="alert-box" style="margin-top: 15px;">
+            <strong>Riesgo Crítico de Denegación de Servicio (DoS)</strong> Un usuario malintencionado o un proceso descontrolado podría acaparar los recursos del sistema y provocar una caída completa del mismo mediante Fork Bombs o agotamiento de FDs.
+        </div>
+    {% endif %}
+
+    <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Protecciones de Red y Routing</h3>
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Parámetro de Kernel</th>
+                <th class="text-center" style="width: 15%;">Estado</th>
+                <th style="width: 55%;">Descripción Técnica</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dos_param in datos.disponibilidad.protecciones_dos.tabla_dos %}
+            <tr>
+                <td><code>{{ dos_param.param }}</code></td>
+                <td class="text-center">
+                    {% if dos_param.estado_color == 'OK' %}
+                        <span class="badge bg-safe">SEGURO</span>
+                    {% elif dos_param.estado_color == 'ADVERTENCIA' %}
+                        <span class="badge bg-warning">MEJORABLE</span>
+                    {% else %}
+                        <span class="badge bg-danger">VULNERABLE</span>
+                    {% endif %}
+                </td>
+                <td>{{ dos_param.desc }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+    <h2 class="subsection-title" style="margin-top: 25px;">16. Mecanismos de Backup y Recuperación</h2>
+
+    <p class="cra-context-text">
+        En estrecha relación con la continuidad operativa, los <strong>Requisitos 2(h) y 2(b) de la CRA</strong> inciden en 
+        garantizar la disponibilidad de las funciones «tras un incidente» y contemplan la capacidad de «restablecer el producto a 
+        su estado original». La presencia y correcta programación de tareas de copia de seguridad (backups) automáticas aseguran la 
+        resiliencia a largo plazo, dotando al sistema de mecanismos fiables para recuperar su operatividad y configuración en caso 
+        de fallos críticos o ciberataques disruptivos.
+    </p>
+
+    <table class="data-table text-xs table-fixed">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Nombre del Servicio / Tarea</th>
+                <th class="text-center" style="width: 20%;">Tipo de Activador</th>
+                <th class="text-center" style="width: 15%;">Estado Actual</th>
+                <th style="width: 25%;">Ruta / Descripción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for backup in datos.disponibilidad.backups.tabla_backups %}
+            <tr>
+                <td class="col-path"><strong>{{ backup.nombre }}</strong></td>
+                <td class="text-center">{{ backup.tipo }}</td>
+                <td class="text-center">
+                    {% if backup.estado_color == 'OK' %}
+                        <span class="badge bg-safe">{{ backup.estado }}</span>
+                    {% else %}
+                        <span class="badge bg-warning">{{ backup.estado }}</span>
+                    {% endif %}
+                </td>
+                <td class="col-path text-muted">{{ backup.ruta }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted">No se detectaron tareas programadas o servicios de copia de seguridad.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if datos.disponibilidad.backups.huerfanos %}
+        <div class="info-box" style="margin-top: 10px; background-color: #e3f2fd; border-left-color: #3498db; color: #1e3a8a;">
+            <strong>¡Aviso de Configuración! Servicios Huérfanos Detectados:</strong> 
+            Se han detectado unidades de servicio de backup instaladas pero sin ningún 'Timer' que ordene su ejecución automática. Los siguientes servicios deberán ejecutarse manualmente: 
+            <span class="font-mono">{{ datos.disponibilidad.backups.huerfanos | join(', ') }}</span>.
+        </div>
+    {% endif %}
+
+    <p style="text-align: center; margin-bottom: 20px; font-size: 8pt; color: #7f8c8d;">
+        -- Fin del Informe Oficial -- <br>
+        Generado automáticamente mediante Sealguard
+    </p>
+
+</body>
+</html>
