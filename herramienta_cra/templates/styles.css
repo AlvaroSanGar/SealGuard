@@ -8,12 +8,6 @@
         font-size: 9pt;
         color: #7f8c8d;
     }
-    @bottom-left {
-        content: "CRA Linux Auditor - ID: " string(report-id);
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 9pt;
-        color: #7f8c8d;
-    }
 }
 
 body {
@@ -34,28 +28,30 @@ body {
 /* Portada */
 .cover-page {
     text-align: center;
-    margin-top: 80px;
+    margin-top: 30px;
     height: 800px;
 }
 
-.logo-container {
-    margin-bottom: 40px;
+.logo-container { 
+    margin-bottom: 30px; 
 }
 
-.logo-container img {
-    max-width: 280px; /* Tamaño del logo ajustado */
-    height: auto;
+.logo-container img { 
+    max-width: 500px; 
+    height: auto; 
 }
 
-.cover-title { 
-    font-size: 32pt; 
-    color: var(--navy-blue); 
-    margin-bottom: 10px; 
-    border-bottom: 3px solid var(--primary-blue); 
-    padding-bottom: 15px;
+
+.cover-subtitle { 
+    font-size: 16pt; 
+    color: #7f8c8d; 
+    margin-bottom: 10px;
+    margin-top: -50px; 
+    font-weight: normal; 
+    border-top: 3px solid var(--primary-blue); 
+    padding-top: 15px;
     display: inline-block;
 }
-.cover-subtitle { font-size: 16pt; color: #7f8c8d; margin-bottom: 50px; font-weight: normal; }
 .cover-details { margin-top: 80px; text-align: left; background: var(--bg-gray); padding: 30px; border-radius: 8px; border: 1px solid var(--border-gray); }
 
 
@@ -460,3 +456,59 @@ ul { margin-top: 5px; padding-left: 20px; }
     color: #7f8c8d;
     font-weight: normal;
 }
+
+
+
+/* --- CONTEXTO NORMATIVO CRA Y TABLAS DE IMPACTO --- */
+
+.cra-context-box {
+    background-color: #f8fafc;
+    border-left: 4px solid var(--navy-blue);
+    padding: 15px;
+    margin-bottom: 25px;
+}
+
+.cra-context-title {
+    margin-top: 0;
+    color: var(--navy-blue);
+    font-size: 12pt;
+}
+
+.cra-context-text {
+    font-size: 9.5pt;
+    line-height: 1.5;
+    text-align: justify;
+    margin-bottom: 0;
+}
+
+.table-description {
+    font-size: 9pt;
+    margin-bottom: 10px;
+    color: #555555;
+}
+
+/* Utilidades extra para anchos de columna */
+.col-w-25 { width: 25%; }
+.col-w-75 { width: 75%; }
+
+/* Ajuste específico para los puntos de color dentro de las tablas */
+.table-dot {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Ajuste de margen superior para subtítulos seguidos */
+.mt-sm { margin-top: 15px !important; }
+
+
+
+/* --- CONTEXTO NORMATIVO CRA (Texto Plano) --- */
+
+.cra-context-text {
+    text-align: justify;
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #334155;
+    line-height: 1.6;
+}
+

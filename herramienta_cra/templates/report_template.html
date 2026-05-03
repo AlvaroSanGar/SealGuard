@@ -13,7 +13,6 @@
             <img src="sealguard-security.png" alt="Logo Sealguard CRA">
         </div>
         
-        <h1 class="cover-title">Informe de Auditoría Técnica</h1>
         <h2 class="cover-subtitle">Evaluación de Cumplimiento: Ley de Ciberresiliencia (CRA)</h2>
         
         <div class="cover-details">
@@ -22,25 +21,24 @@
                 <tr><th style="width: 35%;">ID de Auditoría:</th><td>#{{ id }}</td></tr>
                 <tr><th>Fecha de Ejecución:</th><td>{{ fecha }}</td></tr>
                 <tr><th>Hostname Objetivo:</th><td>{{ datos.sistema.hostname | default('Desconocido') }}</td></tr>
-                <tr><th>Sistema Operativo:</th><td>{{ datos.sistema.dist }} {{ datos.sistema.version }}</td></tr>
-                <tr><th>Arquitectura:</th><td>{{ datos.sistema.arquitectura }}</td></tr>
                 <tr><th>Motor de Auditoría:</th><td>Python Automated Scanner (UCLM TFG)</td></tr>
             </table>
         </div>
     </div>
-<div class="toc" style="page-break-after: always;">
+    
+    <div class="toc" style="page-break-after: always; page-break-before: always;">
         <h1 style="color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Índice de Contenidos</h1>
         <ul class="toc-list">
             <li class="toc-main"><a href="#resumen">Resumen Ejecutivo de Cumplimiento</a></li>
-            <li class="toc-main"><a href="#anexo-1">Anexo I: Red y Vulnerabilidades</a></li>
+            <li class="toc-main"><a href="#anexo-1">Sección I: Red y Vulnerabilidades</a></li>
             <li class="toc-sub"><a href="#anexo-1">1. Exposición de Servicios (Networking)</a></li>
             <li class="toc-sub"><a href="#anexo-1">2. Gestión de Vulnerabilidades (CVEs)</a></li>
 
-            <li class="toc-main"><a href="#anexo-2">Anexo II: Identidad y Accesos</a></li>
+            <li class="toc-main"><a href="#anexo-2">Sección II: Identidad y Accesos</a></li>
             <li class="toc-sub"><a href="#anexo-2">3. Políticas generales de usuarios</a></li>
             <li class="toc-sub"><a href="#anexo-2">4. Auditoría de Usuarios Relevantes</a></li>
 
-            <li class="toc-main"><a href="#anexo-3">Anexo III: Hardening del Sistema</a></li>
+            <li class="toc-main"><a href="#anexo-3">Sección III: Hardening del Sistema</a></li>
             <li class="toc-sub"><a href="#anexo-3">5. Control de Acceso y Memoria</a></li>
             <li class="toc-sub"><a href="#anexo-3">6. Seguridad del Servicio SSH</a></li>
             <li class="toc-sub"><a href="#anexo-3">7. Firewall</a></li>
@@ -49,18 +47,23 @@
             <li class="toc-sub"><a href="#anexo-3">10. Permisos de Archivos Críticos</a></li>
             <li class="toc-sub"><a href="#anexo-3">17. Auditoría de Certificados (PKI)</a></li>
 
-            <li class="toc-main"><a href="#anexo-4">Anexo IV: Integridad y Arranque</a></li>
+            <li class="toc-main"><a href="#anexo-4">Sección IV: Integridad y Arranque</a></li>
             <li class="toc-sub"><a href="#anexo-4">11. Monitorización de Integridad</a></li>
             <li class="toc-sub"><a href="#anexo-4">12. Seguridad de Arranque y Firmware</a></li>
 
-            <li class="toc-main"><a href="#anexo-5">Anexo V: Disponibilidad y Continuidad</a></li>
+            <li class="toc-main"><a href="#anexo-5">Sección V: Disponibilidad y Continuidad</a></li>
             <li class="toc-sub"><a href="#anexo-5">13. Protecciones contra DDoS</a></li>
             <li class="toc-sub"><a href="#anexo-5">14. Mecanismos de Backup y Recuperación</a></li>
         </ul>
     </div>
 
     <h1 id="resumen" class="section-title">Resumen Ejecutivo de Cumplimiento</h1>
-<p style="margin-bottom: 20px;">Breve resumen de los datos obtenidos sobre el equipo para la auditoría CRA.</p>
+    <p class="cra-context-text">
+        Este informe técnico mapea la configuración actual del sistema contra los <strong>Requisitos Esenciales de Ciberseguridad
+         estipulados en el Anexo I</strong> de la propuesta de la CRA de la Unión Europea. El objetivo de esta auditoría automatizada
+         es certificar que el producto con elementos digitales cumple con los principios de <em>Secure by Default</em> y <em>Secure
+         by Design</em> exigidos para su comercialización.
+    </p>
 
 <table class="layout-table">
     <tr>
@@ -104,6 +107,38 @@
     </tr>
 </table>
 
+<h2 class="subsection-title mt-sm">Impacto Legal y Normativo</h2>
+    <p class="cra-context-text">
+        La siguiente tabla traduce el estado técnico de los controles evaluados en su impacto frente a la normativa CRA. Cabe destacar que 
+        <strong>la rigidez de estos requisitos y el proceso de certificación (autoevaluación vs. auditoría de terceros) son adaptables al nivel 
+        de riesgo del producto</strong>. Según la CRA, los productos se clasifican en: Categoría por Defecto, Clase I (Críticos) y Clase II (Altamente Críticos)
+        . Un hallazgo en estado de "Peligro" podrá presentar consecuencias en forma de sanciones o de bloqueo de mercado mucho más severas dependiendo de dicha clasificación.
+        Por favor tenga en cuenta que queda fuera de a herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado.
+    </p>
+    <table class="data-table mt-0">
+        <thead>
+            <tr>
+                <th class="col-w-25">Estado</th>
+                <th class="col-w-75">Evaluación de Cumplimiento Normativo (CRA)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="dot bg-safe table-dot"></span> <strong>Seguro</strong></td>
+                <td>El sistema mitiga adecuadamente los riesgos asociados a este control. Cumple de manera satisfactoria con el requisito esencial aplicable.</td>
+            </tr>
+            <tr>
+                <td><span class="dot bg-warning table-dot"></span> <strong>Advertencia</strong></td>
+                <td>Práctica de seguridad mejorable. Aunque actualmente no es un bloqueante legal, podría derivar en un incumplimiento ante nuevas regulaciones o vectores de ataque.</td>
+            </tr>
+            <tr>
+                <td><span class="dot bg-danger table-dot"></span> <strong>Peligro (Crítico)</strong></td>
+                <td><strong>No conformidad severa.</strong> Existe una violación directa del principio de "Seguridad por Defecto" que expone el sistema. Representa un bloqueo crítico para la certificación del producto.</td>
+            </tr>
+        </tbody>
+    </table>
+
+
 <h2 class="subsection-title" style="margin-top: 20px;">Auditoría por Módulos</h2>
 <table class="data-table mt-0">
     <thead>
@@ -137,10 +172,17 @@
 
 
     <!--        Anexo 1         -->
-    <h1 id="anexo-1" class="section-title">Anexo I: Red y Vulnerabilidades</h1>
+    <h1 id="anexo-1" class="section-title">Sección I: Red y Vulnerabilidades</h1>
     
     <h2 class="subsection-title">1. Exposición de Servicios</h2>
-
+    <!-- Explicación normativa -->
+        <p class="cra-context-text">
+            El <strong>Anexo I, Parte I, Requisitos 2(b) y 2(j) de la CRA</strong> exige que los productos con elementos digitales se comercialicen con una
+            "configuración segura por defecto" y estén diseñados para "limitar las superficies de ataque, incluidas las interfaces externas". 
+            Esto obliga a que cualquier puerto o servicio de red que no sea estrictamente necesario para el funcionamiento esencial del dispositivo deba 
+            estar deshabilitado. La presencia de servicios expuestos no autorizados (marcados como PROHIBIDO) representa una violación directa de este 
+            principio.        
+        </p>
     {% if datos.puertos | length > 0 %}
         {% for grupo in datos.puertos | groupby('ip') %}
             
@@ -182,11 +224,15 @@
         {% endfor %}
     {% else %}
         <div class="success-box">
-            <strong>[✓] Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
+            <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
         </div>
     {% endif %}
 
 <h2 class="subsection-title">2. Gestión de Vulnerabilidades</h2>
+
+    <p class="cra-context-text">
+        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>«sin vulnerabilidades aprovechables conocidas»</em>. Adicionalmente, la <strong>Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto y a abordar y subsanar dichas vulnerabilidades <em>«sin demora»</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo base supone un incumplimiento directo de estos mandatos de ciberresiliencia.
+    </p>
     <div class="info-box">Total de paquetes escaneados: {{ datos.paquetes.apt + datos.paquetes.pip }} (APT y PIP).</div>
     
     <table class="data-table">
@@ -245,9 +291,19 @@
 
 
 
+
+
     <!--        Anexo 2         -->
-    <h1 id="anexo-2" class="section-title">Anexo II: Identidad y Accesos</h1>
+    <h1 id="anexo-2" class="section-title">Sección II: Identidad y Accesos</h1>
     <h2 class="subsection-title">3. Políticas generales de usuarios</h2>
+    <!-- Normativa -->
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(d) de la CRA</strong> establece la obligatoriedad de proteger el producto frente a 
+        accesos no autorizados mediante mecanismos de control de identidad adecuados. En el nivel del sistema operativo base, esto 
+        exige la configuración estricta de las políticas de contraseñas (como su caducidad y complejidad en <code>login.defs</code>) 
+        y la correcta gestión del ciclo de vida de los usuarios. Una configuración laxa en estos parámetros contraviene el principio 
+        de seguridad por defecto de la normativa, facilitando ataques de fuerza bruta o escalada de privilegios.
+    </p>
     
     <table class="data-table">
         <tr>
@@ -267,7 +323,7 @@
         {% endfor %}
     </table>
 
-    
+
     <h2 class="subsection-title">4. Auditoría de Usuarios Relevantes</h2>
     
     <table class="data-table text-xs">
@@ -330,9 +386,17 @@
             {% endfor %}
         </tbody>
     </table>
+
     
     <h2 class="subsection-title">5. Autenticación Multifactor</h2>
-    
+    <!-- Contexto normativo -->
+    <p class="cra-context-text">
+        En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA (Requisito 2.d)</strong>, 
+        la implementación de Autenticación Multifactor (MFA) constituye un control técnico fundamental. Su ausencia en vías de acceso
+         críticas, como la administración remota, representa un riesgo severo de suplantación de identidad que comprometería la 
+         validación del sistema como "seguro por defecto" exigido por la normativa europea.
+    </p>
+
     {% if datos['2FA'].mfa_global %}
         <div class="success-box"><strong>MFA Global (PAM):</strong> Se han detectado módulos de doble factor en la configuración base del sistema (common-auth).</div>
     {% else %}
@@ -441,9 +505,16 @@
 
 
     <!--        Anexo 3         -->
-    <h1 id="anexo-3" class="section-title">Anexo III: Hardening del Sistema</h1>
-
+    <h1 id="anexo-3" class="section-title">Sección III: Hardening del Sistema</h1>
+    
+    <p class="cra-context-text">
+        La <strong>Ley de Ciberresiliencia (CRA)</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos se comercializarán con una «configuración segura por defecto». El proceso de bastionado (hardening) evaluado en esta sección es el mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la obligación de salvaguardar la integridad de los programas frente a manipulaciones <strong>(Requisito 2.f)</strong> y aplicar mecanismos para mitigar el aprovechamiento de vulnerabilidades <strong>(Requisito 2.k)</strong>.
+    </p>
+    
     <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
+    <p class="cra-context-text">
+        La implementación de sistemas de Control de Acceso Obligatorio (MAC) y la randomización de memoria (ASLR) permiten al producto cumplir con el <strong>Requisito 2(k) de la CRA</strong>, el cual exige diseñar los sistemas provistos de «mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades», limitando el impacto de un posible incidente.
+    </p>
     <table class="data-table text-xs table-fixed">
         <thead>
             <tr>
@@ -524,8 +595,12 @@
     
     <h2 class="subsection-title">7. Auditoría de Certificados y Claves</h2>
     
+    <p class="cra-context-text">
+        La gestión adecuada de la Infraestructura de Clave Pública y de las claves criptográficas es esencial para cumplir con el <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong>, que exige proteger la confidencialidad de los datos tratados y transmitidos (cifrado en tránsito). Además, la validez y protección de estos archivos en el sistema fundamentan los mecanismos de autenticación seguros requeridos por el <strong>Requisito 2(d)</strong>. Un certificado caducado o una clave privada con permisos excesivos comprometen directamente la cadena de confianza y la seguridad del producto.
+    </p>
+    
     {% if datos.hardening.certificados.estado == 'SEGURO' and not datos.hardening.certificados.tabla_certificados %}
-        <div class="info-box"><strong>Infraestructura PKI:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
+        <div class="info-box"><strong>Infraestructura de Claves:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
     {% else %}
         <table class="data-table text-xs table-fixed">
             <thead>
@@ -602,6 +677,11 @@
     {% endif %}
 
     <h2 class="subsection-title">9. Firewall</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Requisito 2(j) de la CRA</strong> obliga de manera explícita a que los productos estén diseñados para «limitar las superficies de ataque, incluidas las interfaces externas». La presencia y correcta configuración de un cortafuegos (Firewall) a nivel de kernel es el control técnico idóneo para validar este requerimiento, asegurando que el equipo aplique políticas restrictivas frente a conexiones no autorizadas.
+    </p>
+    
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Gestores de Firewall</h3>
     <table class="data-table text-xs table-fixed">
         <thead>
@@ -695,7 +775,10 @@
     {% endif %}
 
 <h2 class="subsection-title">10. Cifrado de Almacenamiento</h2>
-    
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong> es concluyente al requerir que los productos «protegerán la confidencialidad de los datos [...] mediante, por ejemplo, el cifrado de los datos en reposo». La ausencia de cifrado (como LUKS en entornos Linux) en particiones que alberguen información sensible supone una vulneración directa de este mandato legal, exponiendo la configuración y la información ante el acceso físico directo o el robo del dispositivo.
+    </p>
+
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Análisis de Particiones Físicas</h3>
     <table class="data-table text-xs table-fixed">
         <thead>
@@ -733,7 +816,7 @@
 
     {% if datos.hardening.cifrado.estado == 'SEGURO' %}
         <div class="success-box">
-            <strong>Protección Completa:</strong> Todos los puntos de montaje críticos identificados en el sistema ({{ datos.hardening.cifrado.criticos_encontrados | join(', ') }}) se encuentran debidamente cifrados. El riesgo de acceso físico a datos en reposo está mitigado.
+            <strong>Protección Completa:</strong> Todos los puntos de montaje críticos identificados en el sistema ({{ datos.hardening.cifrado.criticos_encontrados | join(', ') }}) se encuentran debidamente cifrados. El riesgo de acceso físico a datos en reposo está mitigado conforme a la CRA.
         </div>
     {% else %}
         <div class="alert-box">
@@ -750,6 +833,11 @@
     {% endif %}
 
     <h2 class="subsection-title">11. Binarios con Permisos Peligrosos (SUID / SGID)</h2>
+
+    <p class="cra-context-text">
+        En virtud del <strong>Requisito 2(f) de la CRA</strong>, los dispositivos deben proteger «los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada». Auditar los binarios con permisos elevados (SUID/SGID) y los privilegios asignados a los archivos de configuración core (como <code>/etc/shadow</code> o <code>/etc/sudoers</code>) es vital. Identificar y reportar permisos excesivos garantiza la verificación de la resistencia del sistema frente a técnicas locales de escalada de privilegios y persistencia.
+    </p>
+
     {% if datos.hardening.suid_sgid.peligrosos|length == 0 %}
         <div class="success-box">
             <strong>Protección Activa:</strong> Se han auditado {{ datos.hardening.suid_sgid.seguros }} procesos con SUID/SGID activos. Ninguno de ellos se encuentra en directorios críticos ni posee permisos excesivos.
@@ -836,9 +924,18 @@
 
 
     <!--        ANEXO 4         -->
-    <h1 id="anexo-4" class="section-title">Anexo IV: Integridad y Arranque</h1>
+    <h1 id="anexo-4" class="section-title">Sección IV: Integridad y Arranque</h1>
 
     <h2 class="subsection-title">13. Monitorización de Integridad</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(f) de la CRA</strong> exige que los productos protejan «la integridad de los datos 
+        [...], los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada [...] e 
+        informarán sobre los casos de corrupción de datos». La monitorización continua de archivos críticos base es el control 
+        técnico directo para satisfacer esta obligación, permitiendo detectar de forma temprana troyanizaciones, inyecciones de 
+        código o alteraciones indebidas en la configuración estructural del sistema.
+    </p>
+    
     <table class="data-table text-xs table-fixed">
         <thead>
             <tr>
@@ -880,6 +977,14 @@
         </tbody>
     </table>
     <h2 class="subsection-title">14. Seguridad de Arranque y Firmware</h2>
+
+    <p class="cra-context-text">
+        La cadena de confianza en el arranque es vital para garantizar la ciberresiliencia del producto desde su encendido. Los 
+        <strong>Requisitos 2(b) (Configuración segura por defecto) y 2(f) (Integridad) de la CRA</strong> demandan que el sistema 
+        base no sea susceptible a inyecciones de código a bajo nivel. Validar el uso de <em>Secure Boot</em>, auditar la 
+        contaminación del kernel (<em>Tainted State</em>) y asegurar los parámetros del gestor de arranque previenen la ejecución 
+        de firmware o módulos no autorizados antes de que las políticas de seguridad del sistema operativo puedan entrar en vigor.
+    </p>
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Verificación de Secure Boot</h3>
     {% if datos.boot.integridad.sb_estado == 'SEGURO' %}
@@ -992,9 +1097,18 @@
 
 
     <!--        Anexo 5         -->
-    <h1 id="anexo-5" class="section-title">Anexo V: Disponibilidad y Continuidad</h1>
+    <h1 id="anexo-5" class="section-title">Sección V: Disponibilidad y Continuidad</h1>
 
     <h2 class="subsection-title">15. Protecciones contra DDoS</h2>
+    
+    <p class="cra-context-text">
+        El <strong>Anexo I, Parte I, Requisito 2(h) de la CRA</strong> exige explícitamente que los productos con elementos digitales 
+        protejan «la disponibilidad de funciones esenciales y básicas, también tras un incidente, también mediante medidas de 
+        resiliencia frente a ataques de denegación de servicio y paliativas de sus efectos». La configuración de límites estrictos 
+        de asignación de recursos del sistema (previniendo el agotamiento por procesos descontrolados) y el bastionado de la pila de 
+        red en el kernel (como la activación de SYN Cookies) son controles obligatorios para acreditar la capacidad del producto para 
+        resistir intentos de saturación intencionados.
+    </p>
     
     <table class="data-table text-xs table-fixed">
         <thead>
@@ -1027,7 +1141,7 @@
 
     {% if datos.disponibilidad.limites_recursos.ningun_limite %}
         <div class="alert-box" style="margin-top: 15px;">
-            <strong>Riesgo Crítico de Denegación de Servicio (DoS): Un usuario malintencionado o un proceso descontrolado podría acaparar los recursos del sistema y provocar una caída completa del mismo mediante Fork Bombs o agotamiento de FDs.
+            <strong>Riesgo Crítico de Denegación de Servicio (DoS)</strong> Un usuario malintencionado o un proceso descontrolado podría acaparar los recursos del sistema y provocar una caída completa del mismo mediante Fork Bombs o agotamiento de FDs.
         </div>
     {% endif %}
 
@@ -1061,6 +1175,15 @@
 
 
     <h2 class="subsection-title" style="margin-top: 25px;">16. Mecanismos de Backup y Recuperación</h2>
+
+    <p class="cra-context-text">
+        En estrecha relación con la continuidad operativa, los <strong>Requisitos 2(h) y 2(b) de la CRA</strong> inciden en 
+        garantizar la disponibilidad de las funciones «tras un incidente» y contemplan la capacidad de «restablecer el producto a 
+        su estado original». La presencia y correcta programación de tareas de copia de seguridad (backups) automáticas aseguran la 
+        resiliencia a largo plazo, dotando al sistema de mecanismos fiables para recuperar su operatividad y configuración en caso 
+        de fallos críticos o ciberataques disruptivos.
+    </p>
+
     <table class="data-table text-xs table-fixed">
         <thead>
             <tr>

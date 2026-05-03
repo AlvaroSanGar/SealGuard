@@ -79,15 +79,49 @@ def info_sis():
     return info
 
 
-# Paquetes instalados con APT
+# NUEVA FUNCIÓN: Detección de familia de Sistema Operativo para compatibilidad
+def obtener_familia_os():
+    data = ejecutar_consulta("SELECT platform, name FROM os_version;")
+    if data and len(data) > 0:
+        plataforma = data[0].get("platform", "").lower()
+        nombre = data[0].get("name", "").lower()
+        
+        # Familia Debian (Ubuntu, Mint, PopOS...)
+        if "ubuntu" in plataforma or "debian" in nombre or "debian" in plataforma:
+            return "debian"
+        
+        # Familia RedHat (Fedora, CentOS, RHEL, AlmaLinux...)
+        elif "centos" in plataforma or "fedora" in nombre or "redhat" in nombre or "rhel" in nombre or "almalinux" in nombre:
+            return "redhat"
+            
+    return "desconocido"
+
+
+# Paquetes instalados con adaptación de familia OS
 def paquetes_instalados():
-    query = "SELECT name, version FROM deb_packages;"
-    resultado = ejecutar_consulta(query)
-    for p in resultado:
-        # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
-        p['ecosystem'] = 'Debian'
-        p['type'] = 'System (APT)'
-    return resultado
+    familia = obtener_familia_os()
+    
+    if familia == "debian":
+        query = "SELECT name, version FROM deb_packages;"
+        resultado = ejecutar_consulta(query)
+        for p in resultado:
+            # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
+            p['ecosystem'] = 'Debian'
+            p['type'] = 'System (APT)'
+        return resultado
+        
+    elif familia == "redhat":
+        # En Fedora/RedHat buscamos paquetes RPM
+        query = "SELECT name, version FROM rpm_packages;"
+        resultado = ejecutar_consulta(query)
+        for p in resultado:
+            # Usamos AlmaLinux como ecosistema compatible para la API de OSV.dev
+            p['ecosystem'] = 'AlmaLinux' 
+            p['type'] = 'System (RPM)'
+        return resultado
+        
+    else:
+        return []
 
 # Paquetes de Python con pip
 def paquetes_python():
