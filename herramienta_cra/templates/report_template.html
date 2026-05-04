@@ -61,8 +61,8 @@
     <p class="cra-context-text">
         Este informe técnico mapea la configuración actual del sistema contra los <strong>Requisitos Esenciales de Ciberseguridad
          estipulados en el Anexo I</strong> de la propuesta de la CRA de la Unión Europea. El objetivo de esta auditoría automatizada
-         es certificar que el producto con elementos digitales cumple con los principios de <em>Secure by Default</em> y <em>Secure
-         by Design</em> exigidos para su comercialización.
+         es certificar que el producto con elementos digitales cumple con los principios de <em>Secure by Default</em> (en el resto del documento lod describiremos como Seguro por Defecto) y 
+         <em>Secure by Design</em> (en el resto del documento lod describiremos como Seguro por Diseño) exigidos para su comercialización.
     </p>
 
 <table class="layout-table">
@@ -110,10 +110,11 @@
 <h2 class="subsection-title mt-sm">Impacto Legal y Normativo</h2>
     <p class="cra-context-text">
         La siguiente tabla traduce el estado técnico de los controles evaluados en su impacto frente a la normativa CRA. Cabe destacar que 
-        <strong>la rigidez de estos requisitos y el proceso de certificación (autoevaluación vs. auditoría de terceros) son adaptables al nivel 
-        de riesgo del producto</strong>. Según la CRA, los productos se clasifican en: Categoría por Defecto, Clase I (Críticos) y Clase II (Altamente Críticos)
+        la rigidez de estos requisitos y el proceso de certificación (autoevaluación vs. auditoría de terceros) son adaptables al nivel 
+        de riesgo del producto. Según la CRA, los productos se clasifican en: Categoría por Defecto, Clase I (Críticos) y Clase II (Altamente Críticos)
         . Un hallazgo en estado de "Peligro" podrá presentar consecuencias en forma de sanciones o de bloqueo de mercado mucho más severas dependiendo de dicha clasificación.
-        Por favor tenga en cuenta que queda fuera de a herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado.
+        Por favor tenga en cuenta que queda fuera de la herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado. Lea el manual de uso de la 
+        herramienta para más información.
     </p>
     <table class="data-table mt-0">
         <thead>
@@ -231,11 +232,10 @@
 <h2 class="subsection-title">2. Gestión de Vulnerabilidades</h2>
 
     <p class="cra-context-text">
-        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>«sin 
-        vulnerabilidades aprovechables conocidas»</em>. Adicionalmente, la <strong>Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar 
-        los componentes presentes en el producto y a abordar y subsanar dichas vulnerabilidades <em>«sin demora»</em>, proporcionando las correspondientes 
-        actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo base supone un incumplimiento directo de estos 
-        mandatos de ciberresiliencia.
+        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>«sin vulnerabilidades aprovechables conocidas»</em>. 
+        Adicionalmente, la <strong>Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto así como a abordar y subsanar dichas vulnerabilidades 
+        <em>«sin demora»</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo base supone un 
+        incumplimiento directo de las condiciones ya mencionadas.
     </p>
 
     <div class="info-box" style="padding: 15px; border-left: 4px solid #f39c12; background-color: #fdfae6; font-family: sans-serif; font-size: 0.9em;">
@@ -409,7 +409,7 @@
         En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA (Requisito 2.d)</strong>, 
         la implementación de Autenticación Multifactor (MFA) constituye un control técnico fundamental. Su ausencia en vías de acceso
          críticas, como la administración remota, representa un riesgo severo de suplantación de identidad que comprometería la 
-         validación del sistema como "seguro por defecto" exigido por la normativa europea.
+         validación del sistema como "seguro por defecto" exigido por la normativa.
     </p>
 
     {% if datos['2FA'].mfa_global %}
@@ -523,7 +523,11 @@
     <h1 id="anexo-3" class="section-title">Sección III: Hardening del Sistema</h1>
     
     <p class="cra-context-text">
-        La <strong>Ley de Ciberresiliencia (CRA)</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos se comercializarán con una «configuración segura por defecto». El proceso de bastionado (hardening) evaluado en esta sección es el mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la obligación de salvaguardar la integridad de los programas frente a manipulaciones <strong>(Requisito 2.f)</strong> y aplicar mecanismos para mitigar el aprovechamiento de vulnerabilidades <strong>(Requisito 2.k)</strong>.
+        La <strong>Ley de Ciberresiliencia (CRA)</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos 
+        se comercializarán con una «configuración segura por defecto». El proceso de bastionado (hardening) evaluado en esta sección es el 
+        mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la 
+        obligación de salvaguardar la integridad de los programas frente a manipulaciones <strong>(Requisito 2.f)</strong> y aplicar 
+        mecanismos para mitigar el aprovechamiento de vulnerabilidades <strong>(Requisito 2.k)</strong>.
     </p>
     
     <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
@@ -611,11 +615,16 @@
     <h2 class="subsection-title">7. Auditoría de Certificados y Claves</h2>
     
     <p class="cra-context-text">
-        La gestión adecuada de la Infraestructura de Clave Pública y de las claves criptográficas es esencial para cumplir con el <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong>, que exige proteger la confidencialidad de los datos tratados y transmitidos (cifrado en tránsito). Además, la validez y protección de estos archivos en el sistema fundamentan los mecanismos de autenticación seguros requeridos por el <strong>Requisito 2(d)</strong>. Un certificado caducado o una clave privada con permisos excesivos comprometen directamente la cadena de confianza y la seguridad del producto.
+        La gestión adecuada de la Infraestructura de Clave Pública y de las claves criptográficas es esencial para cumplir con el <strong>
+        Anexo I, Parte I, Requisito 2(e) de la CRA</strong>, que exige proteger la confidencialidad de los datos tratados y transmitidos 
+        (cifrado en tránsito). Además, la validez y protección de estos archivos en el sistema fundamentan los mecanismos de autenticación 
+        seguros requeridos por el <strong>Requisito 2(d)</strong>. Un certificado caducado o una clave privada con permisos excesivos 
+        comprometen directamente la cadena de confianza y la seguridad del producto.
     </p>
     
     {% if datos.hardening.certificados.estado == 'SEGURO' and not datos.hardening.certificados.tabla_certificados %}
-        <div class="info-box"><strong>Infraestructura de Claves:</strong> No se han definido rutas de certificados críticos para auditar en este entorno.</div>
+        <div class="info-box"><strong>Infraestructura de Claves:</strong> No se han definido rutas de certificados críticos para auditar en 
+            este entorno.</div>
     {% else %}
         <table class="data-table text-xs table-fixed">
             <thead>
@@ -694,7 +703,10 @@
     <h2 class="subsection-title">9. Firewall</h2>
     
     <p class="cra-context-text">
-        El <strong>Requisito 2(j) de la CRA</strong> obliga de manera explícita a que los productos estén diseñados para «limitar las superficies de ataque, incluidas las interfaces externas». La presencia y correcta configuración de un cortafuegos (Firewall) a nivel de kernel es el control técnico idóneo para validar este requerimiento, asegurando que el equipo aplique políticas restrictivas frente a conexiones no autorizadas.
+        El <strong>Requisito 2(j) de la CRA</strong> obliga de manera explícita a que los productos estén diseñados para «limitar las 
+        superficies de ataque, incluidas las interfaces externas». La presencia y correcta configuración de un cortafuegos (Firewall) a 
+        nivel de kernel es el control técnico idóneo para validar este requerimiento, asegurando que el equipo aplique políticas restrictivas 
+        frente a conexiones no autorizadas.
     </p>
     
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Gestores de Firewall</h3>
