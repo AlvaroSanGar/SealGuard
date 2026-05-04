@@ -2,7 +2,6 @@ import os
 import datetime
 import modules.system as mSystem
 from config.settings import config
-from modules.system import obtener_familia_os
 from core.colores_terminal import print_c, mostrar_subtitulos
 
 
@@ -177,8 +176,6 @@ def politicas_passwords(verbose):
 
 
 ###########################################################################################################################
-
-
 def comp_2FA(verbose, usuarios):
     print("")
     print_c("[+] Buscando métodos de doble factor de autentificación")
@@ -195,24 +192,13 @@ def comp_2FA(verbose, usuarios):
         'usuarios_token': []
     }
     
-    # Adaptación dinámica de archivos PAM según la familia del SO
-    familia = obtener_familia_os()
-    
-    if familia == "redhat":
-        archivo_pam_base = "/etc/pam.d/system-auth"
-        str_include = "include system-auth"
-    else:
-        # Por defecto tratamos como familia Debian
-        archivo_pam_base = "/etc/pam.d/common-auth"
-        str_include = "@include common-auth"
-    
     #######################################################################################################################
-    if os.path.exists(archivo_pam_base):
-        modulos_common = comprobar(archivo_pam_base, modulos_2fa)
+    if os.path.exists("/etc/pam.d/common-auth"):
+        modulos_common = comprobar("/etc/pam.d/common-auth", modulos_2fa)
         if modulos_common:
             reporte_2fa["mfa_global"] = True
             if verbose:
-                print_c("     [i] Se han hallado los siguientes módulos en " + archivo_pam_base + ":")
+                print_c("     [i] Se han hallado los siguientes módulos en /etc/pam.d/common-auth:")
                 for m in modulos_common:
                     print_c("         - "+str(m))
     else:
@@ -225,11 +211,11 @@ def comp_2FA(verbose, usuarios):
         
         # Comprobamos si el servicio PAM existe antes de leerlo
         if os.path.exists(arch):
-            comp = modulos_2fa + [str_include] # Usamos el include correspondiente al sistema
+            comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
             confirmacion = comprobar(arch, comp)
-            if ((str_include in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+            if (('@include common-auth' in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
                 reporte_2fa['servicios'][servicio]['protegido'] = True
-                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el include dinámico si usa la config general)
+                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el @include common-auth si usa la config general)
         else:
             # Si el servicio no está instalado, se considera seguro (no es un vector de ataque)
             reporte_2fa['servicios'][servicio]['protegido'] = True
@@ -297,7 +283,7 @@ def comp_2FA(verbose, usuarios):
     return reporte_2fa
 
 
-# Buscamos una serie de strings clave en el archivo indicado y devolvemos los que hemos encontrado (similar a politicas_password)
+    # Buscamos una serie de strings clave en el archivo indicado y devolvemos los que hemos encontrado (similar a politicas_password)
 def comprobar(archivo, buscar):
     resultado = []
     try:
@@ -317,8 +303,6 @@ def comprobar(archivo, buscar):
         print_c(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
     
     return list(set(resultado)) # Nos evitamos duplicados 
-
-
 
 
 def ESCANER_usuarios(verbose):

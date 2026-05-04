@@ -852,7 +852,11 @@ def auditar_certificados(verbose):
 
 
             ################ Verificamos si es autofirmado ########################################################
-            if datos.get("issuer") == datos.get("subject"):
+            # Añadimos comprobación de existencia para evitar que None == None sea True
+            issuer = datos.get("issuer")
+            subject = datos.get("subject")
+
+            if issuer and subject and (issuer == subject):
                 alerta = "El certificado "+str(ruta)+" está AUTOFIRMADO (Peligro en producción)"
                 resultados["alertas"].append(alerta)
                 info_cert["problemas"].append("Certificado Autofirmado")

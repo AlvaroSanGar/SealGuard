@@ -139,7 +139,7 @@ def generar_informe(fecha, datos):
     
     id_reporte = "CRA-" + str(int(time.time()))
     ruta_escritorio = obtener_ruta_escritorio_real()
-    ruta_pdf = os.path.join(ruta_escritorio, f'Reporte_CRA_{id_reporte}.pdf')
+    ruta_pdf = os.path.join(ruta_escritorio, f'Reporte_{id_reporte}.pdf')
     
     try:
         env = Environment(loader=FileSystemLoader('templates'))

@@ -27,6 +27,7 @@ def auditar_integridad_firmware(verbose):
         
     except KeyError:
         print_c("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
+        resultados["detalles"].append(msg)
         white_list = [["P", 1, "Módulo propietario"], ["O", 4096, "Módulo externo"]]
         warning_list = [["W", 512, "Warning"], ["C", 1024, "Staging"], ["K", 32768, "Live patched"]]
         black_list = [["F", 2, "Forzado"], ["R", 8, "Forzado unload"], ["D", 128, "OOPS/BUG"], ["A", 256, "ACPI"], ["E", 8192, "No firmado"]]
@@ -93,6 +94,8 @@ def auditar_integridad_firmware(verbose):
         # Comprobamos las flags haciendo XOR ya que cada una es una potencia de dos
         else:
             for val in (white_list+black_list+warning_list):
+                if len(val) < 3:
+                    continue
                 val_bit = val[1]
                 val_desc = val[2]
                 if resul_tai & val_bit:

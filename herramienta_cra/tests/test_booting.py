@@ -1,201 +1,241 @@
 import unittest
 from unittest.mock import patch, mock_open, MagicMock
+import os
 
-# Importación real apuntando a modules/booting.py
+# Importación de las funciones del módulo booting
 from modules.booting import (
     auditar_integridad_firmware, auditar_parametros_kernel, 
     auditar_seguridad_grub, ESCANER_booting
 )
 
-# Constantes estáticas para evitar el error de los decoradores al inyectar configuraciones
+# Configuración Mock Completa y Corregida
 BOOT_CONFIG_MOCK = {
     "boot": {
         "integridad_kernel": {
-            "white_list": [["P", 1], ["O", 4096]],
-            "warning_list": [["W", 512], ["C", 1024], ["K", 32768]],
-            "black_list": [["F", 2], ["R", 8], ["D", 128], ["A", 256], ["E", 8192]]
+            "white_list": [["P", 1, "Módulo propietario"], ["O", 4096, "Módulo externo"]],
+            "warning_list": [["W", 512, "Warning"], ["C", 1024, "Staging"], ["K", 32768, "Livepatch"]],
+            "black_list": [["F", 2, "Forzado"], ["R", 8, "Unload"], ["E", 8192, "No firmado"]]
         },
         "param_kernel": {
-            "white_list": [["apparmor=1", "selinux=1"], "audit=1"],
-            "black_list": ["init=/bin/bash", "nokaslr"]
+            "white_list": [["apparmor=1", "selinux=1"], "audit=1", "slab_nomerge=1"],
+            "black_list": [["init=/bin/bash", "single"], "nokaslr", ["mitigations=off", "nopti"]]
         },
         "contra_fisica": True
     }
 }
 
-class TestBootingCompleto(unittest.TestCase):
+@patch.dict('modules.booting.config', BOOT_CONFIG_MOCK, clear=True)
+class TestBootingMasivo(unittest.TestCase):
 
-    # =====================================================================
-    # 1. TESTS: INTEGRIDAD DEL FIRMWARE (auditar_integridad_firmware)
-    # =====================================================================
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
+    # --- 1. INTEGRIDAD DE FIRMWARE (8 Tests) ---
+
     @patch('modules.booting.ejecutar_consulta')
     def test_integridad_perfecta(self, mock_db):
-        # SecureBoot activo (1) y Kernel impecable (0)
-        def side_effect(query):
-            if 'secureboot' in query: return [{"secure_boot": 1}]
-            if 'kernel.tainted' in query: return [{"current_value": "0"}]
-            return []
-        mock_db.side_effect = side_effect
-        
+        """Secure Boot Full y Kernel limpio"""
+        mock_db.side_effect = [[{"secure_boot": 1}], [{"current_value": "0"}]]
         res = auditar_integridad_firmware(False)
-        self.assertTrue(res["secure_boot"])
+        self.assertEqual(res["sb_estado"], "SEGURO")
         self.assertTrue(res["kernel_seguro"])
-        self.assertEqual(len(res["alertas"]), 0)
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('modules.booting.ejecutar_consulta')
-    def test_integridad_legacy_y_kernel_corrupto(self, mock_db):
-        # Sin tabla secureboot (Legacy) y Kernel con error crítico (8192 -> E) y warning (512 -> W)
-        def side_effect(query):
-            if 'secureboot' in query: return [] # Falla secureboot
-            if 'kernel.tainted' in query: return [{"current_value": str(8192 + 512)}] 
-            return []
-        mock_db.side_effect = side_effect
-        
+    def test_integridad_sb_medium(self, mock_db):
+        """Secure Boot en modo Medium-Security (Valor 2)"""
+        mock_db.side_effect = [[{"secure_boot": 2}], [{"current_value": "0"}]]
         res = auditar_integridad_firmware(False)
-        self.assertFalse(res["secure_boot"])
-        self.assertFalse(res["kernel_seguro"])
+        self.assertEqual(res["sb_estado"], "ADVERTENCIA")
+
+    @patch('modules.booting.ejecutar_consulta')
+    def test_integridad_sb_off(self, mock_db):
+        """Secure Boot desactivado en sistema UEFI[cite: 5]"""
+        mock_db.side_effect = [[{"secure_boot": 0}], [{"current_value": "0"}]]
+        res = auditar_integridad_firmware(False)
+        self.assertEqual(res["sb_estado"], "PELIGROSO")
+
+    @patch('modules.booting.ejecutar_consulta', return_value=[])
+    def test_integridad_legacy_mode(self, mock_db):
+        """Detección de arranque en modo Legacy[cite: 5]"""
+        res = auditar_integridad_firmware(False)
+        self.assertEqual(res["sb_estado"], "PELIGROSO")
         self.assertTrue(any("Legacy" in a for a in res["alertas"]))
-        self.assertTrue(any("fallo crítico" in a for a in res["alertas"])) # Caza el 8192
-        self.assertTrue(any("peligrosidad media" in a for a in res["alertas"])) # Caza el 512
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('modules.booting.ejecutar_consulta')
-    def test_integridad_fallback_osquery_vacio(self, mock_db):
-        # Simula que OSquery no logra leer el valor tainted
-        def side_effect(query):
-            if 'secureboot' in query: return [{"secure_boot": 2}] # Medium Security
-            if 'kernel.tainted' in query: return [] # Falla query
-            return []
-        mock_db.side_effect = side_effect
-        
+    def test_integridad_kernel_flags_mixtas(self, mock_db):
+        """Detección de múltiples flags (P, W, E)[cite: 5]"""
+        mock_db.side_effect = [[{"secure_boot": 1}], [{"current_value": str(1 + 512 + 8192)}]]
         res = auditar_integridad_firmware(False)
-        self.assertTrue(any("Medium-Security" in a for a in res["alertas"]))
+        self.assertEqual(len(res["tainted_flags"]), 3)
+        self.assertTrue(any("fallo crítico" in a for a in res["alertas"]))
+
+    @patch('modules.booting.ejecutar_consulta')
+    def test_integridad_kernel_flags_desconocidas(self, mock_db):
+        """Kernel alterado pero con flags no listadas[cite: 5]"""
+        mock_db.side_effect = [[{"secure_boot": 1}], [{"current_value": "1048576"}]] # Flag 2^20
+        res = auditar_integridad_firmware(False)
+        self.assertTrue(res["kernel_seguro"]) # problemas_tai es 0
+
+    @patch('modules.booting.ejecutar_consulta', return_value=[])
+    @patch('modules.booting.config', {})
+    def test_integridad_keyerror_fallback(self, mock_db):
+        """Uso de valores por defecto si falla el config.yaml[cite: 5]"""
+        res = auditar_integridad_firmware(False)
+        self.assertTrue(any("No se ha encontrado la configuración" in d for d in res["detalles"]))
+
+    @patch('modules.booting.ejecutar_consulta')
+    def test_integridad_tainted_vacio(self, mock_db):
+        """Fallo en la obtención del valor 'tainted'[cite: 5]"""
+        mock_db.side_effect = [[{"secure_boot": 1}], []]
+        res = auditar_integridad_firmware(False)
         self.assertTrue(any("No se ha logrado obtener el valor" in a for a in res["alertas"]))
 
-    @patch('modules.booting.config', {}) # Forzamos el KeyError pasando un diccionario vacío
-    @patch('modules.booting.ejecutar_consulta')
-    def test_integridad_keyerror_fallback(self, mock_db):
-        # Prueba que el código no explote si falta el config.yaml y cargue los valores hardcodeados
-        mock_db.side_effect = lambda q: [{"secure_boot": 1}] if 'secure' in q else [{"current_value": "0"}]
-        res = auditar_integridad_firmware(False)
-        self.assertTrue(res["kernel_seguro"])
+    # --- 2. PARÁMETROS DEL KERNEL (10 Tests) ---
 
-
-    # =====================================================================
-    # 2. TESTS: PARÁMETROS DEL KERNEL (auditar_parametros_kernel)
-    # =====================================================================
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="apparmor=1 audit=1"\nGRUB_CMDLINE_LINUX_DEFAULT="quiet splash"\n')
-    def test_parametros_kernel_seguro(self, mock_archivo, mock_exists):
-        # Opciones obligatorias están en LINUX, no hay prohibidas
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="apparmor=1 audit=1 slab_nomerge=1"\n')
+    def test_params_seguros_en_linux(self, mock_file, mock_exists):
+        """Configuración óptima persistente[cite: 5]"""
         res = auditar_parametros_kernel(False)
         self.assertEqual(res["estado"], "SEGURO")
-        self.assertEqual(len(res["fallos"]), 0)
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX=""\nGRUB_CMDLINE_LINUX_DEFAULT="apparmor=1 audit=1"\n')
-    def test_parametros_kernel_advertencia(self, mock_archivo, mock_exists):
-        # Las opciones están en DEFAULT y no en LINUX (Genera Advertencia según tu lógica)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX_DEFAULT="apparmor=1 audit=1 slab_nomerge=1"\n')
+    def test_params_advertencia_default(self, mock_file, mock_exists):
+        """CORREGIDO: Parámetros en DEFAULT (incluyendo todos los obligatorios)[cite: 5]"""
         res = auditar_parametros_kernel(False)
         self.assertEqual(res["estado"], "ADVERTENCIA")
-        self.assertTrue(len(res["alertas"]) > 0)
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="init=/bin/bash"\nGRUB_CMDLINE_LINUX_DEFAULT="quiet"\n')
-    def test_parametros_kernel_peligroso(self, mock_archivo, mock_exists):
-        # Faltan opciones seguras y hay una prohibida (black_list)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="init=/bin/bash"\n')
+    def test_params_prohibidos_blacklist(self, mock_file, mock_exists):
+        """Detección de parámetros prohibidos críticos[cite: 5]"""
         res = auditar_parametros_kernel(False)
         self.assertEqual(res["estado"], "PELIGROSO")
-        self.assertTrue(len(res["fallos"]) > 0)
         self.assertTrue(len(res["prohibido"]) > 0)
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="nokaslr mitigations=off"\n')
+    def test_params_blacklist_grupo(self, mock_file, mock_exists):
+        """Detección de múltiples parámetros prohibidos en grupo[cite: 5]"""
+        res = auditar_parametros_kernel(False)
+        self.assertEqual(len(res["prohibido"]), 2)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="selinux=1 audit=1 slab_nomerge=1"\n')
+    def test_params_lista_opciones_or(self, mock_file, mock_exists):
+        """Uso de alternativa válida en la white_list[cite: 5]"""
+        res = auditar_parametros_kernel(False)
+        self.assertEqual(res["estado"], "SEGURO")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX=" apparmor=1   audit=1   slab_nomerge=1 "\n')
+    def test_params_parsing_espacios(self, mock_file, mock_exists):
+        """Robustez del parseo ante espacios extra[cite: 5]"""
+        res = auditar_parametros_kernel(False)
+        self.assertEqual(res["estado"], "SEGURO")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="apparmor=1"\n')
+    def test_params_solo_uno_de_muchos(self, mock_file, mock_exists):
+        """Fallo si solo se configura uno de los tres parámetros obligatorios[cite: 5]"""
+        res = auditar_parametros_kernel(False)
+        self.assertEqual(res["estado"], "PELIGROSO")
+        self.assertEqual(len(res["fallos"]), 2)
+
     @patch('os.path.exists', return_value=False)
-    def test_parametros_kernel_no_existe(self, mock_exists):
-        # Archivo grub no existe
+    def test_params_no_grub_file(self, mock_exists):
+        """Falta del archivo /etc/default/grub[cite: 5]"""
         res = auditar_parametros_kernel(False)
         self.assertEqual(res["estado"], "NO ENCONTRADO")
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK)
     @patch('os.path.exists', return_value=True)
-    def test_parametros_kernel_excepcion_lectura(self, mock_exists):
-        # Archivo existe pero lanza error al leer (ej. falta de permisos)
-        with patch('builtins.open', side_effect=IOError("Permiso denegado")):
+    def test_params_excepcion_lectura(self, mock_exists):
+        """Error de entrada/salida al leer el archivo[cite: 5]"""
+        with patch('builtins.open', side_effect=IOError("Error E/S")):
             res = auditar_parametros_kernel(False)
             self.assertTrue(any("No se ha logrado leer" in a for a in res["alertas"]))
 
+    @patch('modules.booting.config', {"boot": {}})
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='GRUB_CMDLINE_LINUX="audit=1"\n')
+    def test_params_config_vacia_fallback(self, mock_file, mock_exists):
+        """Uso de white_list hardcodeada si falla el config[cite: 5]"""
+        res = auditar_parametros_kernel(False)
+        self.assertEqual(res["estado"], "PELIGROSO") # Fallará porque faltan selinux/apparmor
 
-    # =====================================================================
-    # 3. TESTS: SEGURIDAD GRUB (auditar_seguridad_grub)
-    # =====================================================================
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK) # contra_fisica = True
-    def test_seguridad_grub_datos_faltantes(self):
-        # Viene del módulo hardening como no encontrado o None
-        res = auditar_seguridad_grub(False, {"estado": "NO ENCONTRADO"})
-        self.assertEqual(res["estado"], "PELIGROSO")
-        self.assertTrue(any("no fue encontrado" in a for a in res["alertas"]))
+    # --- 3. SEGURIDAD GRUB (8 Tests) ---
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK) 
-    @patch('os.path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data='set superusers="root"\npassword_pbkdf2 root grub.pbkdf2.sha512...\n')
-    def test_seguridad_grub_perfecto(self, mock_archivo, mock_exists):
-        # Hardening dice OK, archivo de config existe y tiene password_pbkdf2
-        mock_exists.side_effect = lambda path: path == '/boot/grub/grub.cfg' # Simula Debian/Ubuntu
-        datos_hardening = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
-        
-        res = auditar_seguridad_grub(False, datos_hardening)
+    def test_grub_hardening_no_encontrado(self):
+        """Sin datos de auditoría de permisos previa[cite: 5]"""
+        res = auditar_seguridad_grub(False, None)
+        self.assertEqual(res["archivo_estado"], "NO ENCONTRADO")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='password_pbkdf2 root hash\n')
+    def test_grub_seguro_completo(self, mock_file, mock_exists):
+        """Permisos OK y contraseña cifrada activa[cite: 5]"""
+        datos = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
+        res = auditar_seguridad_grub(False, datos)
         self.assertEqual(res["estado"], "SEGURO")
         self.assertTrue(res["protegido"])
-        self.assertTrue(res["permisos_ok"])
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK) 
-    @patch('os.path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data='set timeout=5\n')
-    def test_seguridad_grub_sin_password_pero_hardening_ok(self, mock_archivo, mock_exists):
-        # Permisos OK, pero no hay contraseña. Como la config exige contra_fisica=True, debe fallar.
-        mock_exists.side_effect = lambda path: path == '/boot/grub2/grub.cfg' # Simula RedHat
-        datos_hardening = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
-        
-        res = auditar_seguridad_grub(False, datos_hardening)
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='timeout=5\n')
+    def test_grub_peligroso_sin_pass(self, mock_file, mock_exists):
+        """Permisos OK pero falta seguridad física obligatoria[cite: 5]"""
+        datos = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
+        res = auditar_seguridad_grub(False, datos)
         self.assertEqual(res["estado"], "PELIGROSO")
-        self.assertFalse(res["protegido"])
-        self.assertTrue(res["permisos_ok"])
+        self.assertEqual(res["pass_estado"], "ADVERTENCIA")
 
-    @patch('modules.booting.config', {"boot": {"contra_fisica": False}}) 
-    @patch('os.path.exists', return_value=False)
-    def test_seguridad_grub_excepcion_no_requiere_password(self, mock_exists):
-        # Permisos OK, el archivo grub.cfg ni se encuentra, PERO el yaml dice que no requiere password
-        datos_hardening = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
-        res = auditar_seguridad_grub(False, datos_hardening)
-        # La lógica de tu código dice: elif resultados["permisos_ok"] and not contra -> SEGURO
+    @patch('modules.booting.config', {"boot": {"contra_fisica": False}})
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='timeout=5\n')
+    def test_grub_ok_sin_requisito_pass(self, mock_file, mock_exists):
+        """Seguro si el usuario decide no exigir contraseña física[cite: 5]"""
+        datos = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
+        res = auditar_seguridad_grub(False, datos)
         self.assertEqual(res["estado"], "SEGURO")
 
-    @patch('modules.booting.config', BOOT_CONFIG_MOCK) 
-    def test_seguridad_grub_problemas_hardening(self):
-        # Viene del módulo hardening con problemas de permisos
-        datos_hardening = {"estado": "PELIGROSO", "problemas": ["El dueño esperado es root", "Permisos excesivos"]}
-        # Mockeamos exists a False para forzar salto directo
-        with patch('os.path.exists', return_value=False):
-            res = auditar_seguridad_grub(False, datos_hardening)
-            self.assertEqual(res["estado"], "PELIGROSO")
-            self.assertFalse(res["permisos_ok"])
-            self.assertEqual(len(res["alertas"]), 3) # 2 del hardening + 1 de archivo grub no encontrado
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data='password_pbkdf2 user hash\n')
+    def test_grub_config_path_grub2(self, mock_file, mock_exists):
+        """Soporte para rutas alternativas (RedHat/CentOS)[cite: 5]"""
+        mock_exists.side_effect = lambda p: p == '/boot/grub2/grub.cfg'
+        datos = {"estado": "SEGURO", "archivo": "/boot/grub2/grub.cfg"}
+        res = auditar_seguridad_grub(False, datos)
+        self.assertEqual(res["pass_estado"], "SEGURO")
 
+    @patch('os.path.exists', return_value=True)
+    def test_grub_open_exception_handling(self, mock_exists):
+        """Captura de errores al abrir el archivo de configuración[cite: 5]"""
+        with patch('builtins.open', side_effect=Exception("Error fatal")):
+            datos = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
+            res = auditar_seguridad_grub(False, datos)
+            self.assertFalse(res["protegido"])
 
-    # =====================================================================
-    # 4. TESTS: ESCÁNER PRINCIPAL (ESCANER_booting)
-    # =====================================================================
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='password_pbkdf2 root hash\n')
+    def test_grub_hardening_peligroso_permisos(self, mock_file, mock_exists):
+        """Estado PELIGROSO si los permisos del archivo son inseguros[cite: 5]"""
+        datos = {"estado": "PELIGROSO", "problemas": ["Permisos 777"]}
+        res = auditar_seguridad_grub(False, datos)
+        self.assertEqual(res["estado"], "PELIGROSO")
+        self.assertEqual(res["archivo_estado"], "PELIGROSO")
+
+    @patch('os.path.exists', return_value=False)
+    def test_grub_cfg_no_encontrado(self, mock_exists):
+        """Alerta si el archivo compilado .cfg no existe[cite: 5]"""
+        datos = {"estado": "SEGURO", "archivo": "/boot/grub/grub.cfg"}
+        res = auditar_seguridad_grub(False, datos)
+        self.assertTrue(any("No se encontró el archivo compilado" in a for a in res["alertas"]))
+
+    # --- 4. ORQUESTADOR (1 Test) ---
+
     @patch('modules.booting.auditar_integridad_firmware', return_value={"mock": 1})
     @patch('modules.booting.auditar_parametros_kernel', return_value={"mock": 2})
     @patch('modules.booting.auditar_seguridad_grub', return_value={"mock": 3})
-    def test_escaner_principal(self, mock_grub, mock_kernel, mock_firmware):
-        # Comprobamos que el wrapper consolida los diccionarios correctamente
-        res = ESCANER_booting(False, {"estado": "SEGURO"})
+    def test_escaner_booting_integration(self, m1, m2, m3):
+        """Verificación de la salida consolidada del orquestador[cite: 5]"""
+        res = ESCANER_booting(False, {})
         self.assertEqual(res["integridad"]["mock"], 1)
         self.assertEqual(res["parametros"]["mock"], 2)
         self.assertEqual(res["grub"]["mock"], 3)

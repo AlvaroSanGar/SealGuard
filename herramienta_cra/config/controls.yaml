@@ -33,7 +33,11 @@ network:
 vulnerabilities: 
   min_cvss_score: 7.0 # Reportar vulns de riesgo alto
   comp_kernel: true
-  ignorar: [] # Paquetes de riesgo asumido
+  ignorar: # Paquetes de riesgo asumido o que se ha comprobado que no son vulnerables
+    - "DEBIAN-CVE-2026-31789"
+    - "CVE-2026-31789"
+    - "DEBIAN-CVE-2024-58250"
+    - "CVE-2024-58250" 
   timeout: 30 
 
 

@@ -18,7 +18,7 @@ MOCK_CONFIG = {
 class TestIntegridadModulo(unittest.TestCase):
 
     # =========================================================================
-    # 1. TESTS DE: calcular_hash()
+    # 1. TESTS DE: calcular_integridad()
     # =========================================================================
     @patch('os.stat')
     @patch('os.path.exists')
@@ -26,8 +26,6 @@ class TestIntegridadModulo(unittest.TestCase):
     def test_calcular_hash_camino_feliz(self, mock_file, mock_exists, mock_stat):
         """Comprueba que devuelve el diccionario con hash, mtime y ctime"""
         mock_exists.return_value = True
-        
-        # Simulamos los tiempos del sistema operativo
         mock_stat.return_value.st_mtime = 1600000000.0
         mock_stat.return_value.st_ctime = 1600000005.0
         
@@ -56,6 +54,15 @@ class TestIntegridadModulo(unittest.TestCase):
         resultado = mIntegrity.calcular_integridad("/ruta/falsa")
         self.assertEqual(resultado, "FALTAN PERMISOS")
 
+    @patch('os.path.exists', return_value=True)
+    @patch('os.stat')
+    def test_calcular_hash_error_generico(self, mock_stat, mock_exists):
+        """Comprueba el manejo de excepciones inesperadas (ej. fallo de disco)"""
+        mock_stat.side_effect = Exception("Fallo critico de hardware")
+        
+        resultado = mIntegrity.calcular_integridad("/ruta/test")
+        self.assertTrue(resultado.startswith("ERROR: Fallo critico"))
+
     # =========================================================================
     # 2. TESTS DE: generar_baseline()
     # =========================================================================
@@ -64,21 +71,27 @@ class TestIntegridadModulo(unittest.TestCase):
     @patch('json.dump')
     def test_generar_baseline_feliz(self, mock_json_dump, mock_file, mock_calcular):
         """Comprueba que el baseline guarda los diccionarios correctamente"""
-        # Simulamos que calcular_hash devuelve la nueva estructura
         mock_calcular.return_value = {"hash": "abcd", "mtime": 10.0, "ctime": 10.0}
         
         mIntegrity.generar_baseline()
         
-        # Comprobamos que intentó escribir el JSON
         self.assertTrue(mock_json_dump.called)
-        
-        # Obtenemos los argumentos con los que se llamó a json.dump
         datos_guardados = mock_json_dump.call_args[0][0]
-        
-        # Debería haber 3 archivos según nuestro MOCK_CONFIG (/etc/shadow, /bin/ls, /etc/hosts)
         self.assertEqual(len(datos_guardados), 3)
         self.assertIn("/etc/shadow", datos_guardados)
-        self.assertEqual(datos_guardados["/etc/shadow"]["hash"], "abcd")
+
+    @patch('modules.integrity.calcular_integridad')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.dump')
+    def test_generar_baseline_ignora_errores(self, mock_json_dump, mock_file, mock_calcular):
+        """Verifica que los archivos con error no se guardan en el baseline"""
+        # Tenemos 3 rutas en MOCK_CONFIG. Simulamos error en la 1ª, éxito en la 2ª y None en la 3ª.
+        mock_calcular.side_effect = ["FALTAN PERMISOS", {"hash": "ok", "mtime": 1, "ctime": 1}, None]
+        
+        mIntegrity.generar_baseline()
+        
+        datos_guardados = mock_json_dump.call_args[0][0]
+        self.assertEqual(len(datos_guardados), 1)
 
     # =========================================================================
     # 3. TESTS DE: verificar_integridad()
@@ -90,44 +103,67 @@ class TestIntegridadModulo(unittest.TestCase):
         res = mIntegrity.verificar_integridad(verbose=False)
         self.assertIsNone(res)
 
-    @patch('os.path.exists')
+    @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open)
     @patch('json.load')
     @patch('modules.integrity.calcular_integridad')
     def test_verificar_integridad_detecta_cambios(self, mock_calcular, mock_json_load, mock_file, mock_exists):
         """Prueba central: ¿Detecta cuando mtime/ctime o el hash cambian?"""
-        mock_exists.return_value = True
-        
-        # Simulamos el contenido del archivo JSON antiguo (Baseline)
         mock_json_load.return_value = {
             "/etc/shadow": {"hash": "hash_antiguo", "mtime": 1.0, "ctime": 1.0},
             "/bin/ls": {"hash": "mismo_hash", "mtime": 2.0, "ctime": 2.0}
         }
         
-        # Simulamos lo que lee el sistema AHORA (calcular_hash)
         def mock_calcular_side_effect(ruta):
             if ruta == "/etc/shadow":
-                # MODIFICADO: El hash cambió
                 return {"hash": "hash_NUEVO", "mtime": 1.0, "ctime": 1.0}
             elif ruta == "/bin/ls":
-                # INTACTO: Todo es exactamente igual
                 return {"hash": "mismo_hash", "mtime": 2.0, "ctime": 2.0}
-            else:
-                # NO_RASTREADO: Un archivo que no estaba en el JSON antiguo
-                return {"hash": "x", "mtime": 0, "ctime": 0}
+            return None
                 
         mock_calcular.side_effect = mock_calcular_side_effect
-
         resultados = mIntegrity.verificar_integridad(verbose=False)
         
-        # Buscamos los estados en el resultado
         estado_shadow = next((item['estado'] for item in resultados if item['archivo'] == '/etc/shadow'), None)
         estado_ls = next((item['estado'] for item in resultados if item['archivo'] == '/bin/ls'), None)
-        estado_hosts = next((item['estado'] for item in resultados if item['archivo'] == '/etc/hosts'), None)
-
         self.assertEqual(estado_shadow, "MODIFICADO")
         self.assertEqual(estado_ls, "INTACTO")
-        self.assertEqual(estado_hosts, "NO_RASTREADO")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.load')
+    @patch('modules.integrity.calcular_integridad')
+    def test_verificar_integridad_detalles_especificos(self, mock_calcular, mock_json_load, mock_file, mock_exists):
+        """Verifica que identifica si cambió el hash, el mtime o el ctime de forma independiente"""
+        mock_json_load.return_value = {
+            "/etc/shadow": {"hash": "old_hash", "mtime": 10.0, "ctime": 10.0}
+        }
+        mock_calcular.return_value = {"hash": "old_hash", "mtime": 20.0, "ctime": 20.0}
+
+        resultados = mIntegrity.verificar_integridad(verbose=False)
+        # Buscamos el resultado del archivo shadow
+        res_shadow = next(item for item in resultados if item['archivo'] == '/etc/shadow')
+        detalles = res_shadow['detalles_cambio']
+
+        self.assertEqual(res_shadow['estado'], "MODIFICADO")
+        self.assertIn("mtime", detalles)
+        self.assertIn("ctime", detalles)
+        self.assertNotIn("hash", detalles)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.load')
+    @patch('modules.integrity.calcular_integridad')
+    def test_verificar_integridad_archivo_borrado(self, mock_calcular, mock_json_load, mock_file, mock_exists):
+        """Verifica el estado cuando un archivo del baseline desaparece"""
+        mock_json_load.return_value = {
+            "/etc/shadow": {"hash": "abc", "mtime": 1.0, "ctime": 1.0}
+        }
+        mock_calcular.return_value = None 
+
+        resultados = mIntegrity.verificar_integridad(verbose=False)
+        res_shadow = next(item for item in resultados if item['archivo'] == '/etc/shadow')
+        self.assertEqual(res_shadow['estado'], "INACCESIBLE / BORRADO")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -1,101 +1,165 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 import requests
+import gzip
+import subprocess
+import time
 import modules.vulns as mVuln
 
-# Creamos un mock de configuración base para evitar dependencias del entorno real
+# Configuración mock base
 CONFIG_MOCK = {
     "vulnerabilities": {
-        "min_cvss_score": 0.0,
-        "nist_api_key": ""
+        "min_cvss_score": 5.0,
+        "nist_api_key": "test_key",
+        "ignorar": ["CVE-1999-0001"]
     }
 }
 
-class TestVulnsModule(unittest.TestCase):
+class TestVulnsModuleActualizado(unittest.TestCase):
 
     def setUp(self):
-        # Preparamos una lista de paquetes falsa que usaremos en todos los tests
-        self.paquetes_mock = [
-            {
-                'name': 'curl', 
-                'version': '7.81.0', 
-                'ecosystem': 'Debian', 
-                'type': 'System (APT)'
-            }
-        ]
+        # Reiniciamos las cachés globales para evitar contaminación entre tests
+        mVuln.cache_cvss = {}
+        mVuln.cache_detalles_osv = {}
+        mVuln.INFO_SO_SISTEMA = None
+        self.paquete_apt = [{
+            'name': 'bash',
+            'version': '5.1-6',
+            'ecosystem': 'Debian',
+            'type': 'System (APT)'
+        }]
 
-    # [!] Al pasar CONFIG_MOCK directamente, NO se añade mock_config a los parámetros
-    @patch('modules.vulns.config', CONFIG_MOCK)
-    @patch('modules.vulns.obtener_score_cvss', return_value=8.5) 
-    @patch('modules.vulns.requests.post')
-    def test_escanear_vulnerabilidades_con_vulns(self, mock_post, mock_score):
-        """Camino Feliz: La API responde 200 OK y encuentra 2 vulnerabilidades."""
-        
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        
-        mock_response.json.return_value = {
-            "results": [
-                {
-                    "vulns": [
-                        {"id": "CVE-2023-1234"},
-                        {"id": "CVE-2023-5678"}
-                    ]
-                }
-            ]
+    # --- 1. TESTS DE FILTRADO Y LÓGICA LOCAL ---
+
+    @patch('modules.vulns.os.path.exists', return_value=True)
+    @patch('gzip.open', new_callable=mock_open, read_data="Fixed CVE-2023-1234\n")
+    def test_cve_esta_en_changelog(self, mock_gzip, mock_exists):
+        res = mVuln.cve_esta_en_changelog("bash", "CVE-2023-1234")
+        self.assertTrue(res)
+
+    @patch('modules.vulns.mSystem.info_sis', return_value={'version': '12.0', 'dist': 'debian'})
+    @patch('subprocess.run')
+    def test_es_falso_positivo_so_dpkg(self, mock_sub, mock_info):
+        mock_sub.return_value = MagicMock(returncode=0)
+        vuln_data = {
+            "id": "CVE-2024-9999",
+            "affected": [{"ranges": [{"type": "ECOSYSTEM", "events": [{"fixed": "5.0"}]}]}]
         }
-        mock_post.return_value = mock_response
+        res = mVuln.es_falso_positivo_so("5.1", vuln_data, "bash")
+        self.assertTrue(res)
 
-        resultado = mVuln.escanear_vulnerabilidades(self.paquetes_mock)
-
-        # Comprobaciones principales
-        self.assertEqual(len(resultado), 1)  # 1 paquete vulnerable detectado
-        self.assertEqual(resultado[0]['paquete'], 'curl')
-        self.assertEqual(resultado[0]['cantidad'], 2)
+    @patch('modules.system.info_sis')
+    def test_obtener_contexto_so_calculo_año(self, mock_info):
+        mock_info.return_value = {'version': '22.04', 'dist': 'ubuntu'}
+        res = mVuln.obtener_contexto_so()
+        self.assertEqual(res["año_corte"], 2018)
         
-        # Extraemos los IDs de los diccionarios para poder compararlos correctamente
-        ids_detectados = [vuln['id'] for vuln in resultado[0]['cves']]
-        self.assertIn("CVE-2023-1234", ids_detectados)
-        self.assertIn("CVE-2023-5678", ids_detectados)
+        mVuln.INFO_SO_SISTEMA = None
+        mock_info.return_value = {'version': 'unknown', 'dist': 'linux'}
+        res = mVuln.obtener_contexto_so()
+        self.assertEqual(res["año_corte"], 2022)
 
+    # --- 2. TESTS DE CACHÉ Y RATE-LIMITING ---
+
+    @patch('modules.vulns.session_http.get')
+    def test_cache_cvss_evita_peticiones_duplicadas(self, mock_get):
+        mVuln.cache_cvss["CVE-2026-0001"] = 9.0
+        score = mVuln.obtener_score_cvss("CVE-2026-0001")
+        self.assertEqual(score, 9.0)
+        mock_get.assert_not_called()
+
+    @patch('modules.vulns.config', {"vulnerabilities": {"nist_api_key": "clave_real"}})
+    @patch('modules.vulns.session_http.get')
+    @patch('time.sleep')
+    def test_rate_limit_con_api_key(self, mock_sleep, mock_get):
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"vulnerabilities": [{"cve": {"metrics": {"cvssMetricV31": [{"cvssData": {"baseScore": 5.0}}]}}}]}
+        mock_get.return_value = mock_resp
+        mVuln.obtener_score_cvss("CVE-2024-1111")
+        mock_sleep.assert_called_with(0.6)
+
+    @patch('modules.vulns.config', {"vulnerabilities": {"nist_api_key": None}})
+    @patch('modules.vulns.session_http.get')
+    @patch('time.sleep')
+    def test_rate_limit_sin_api_key(self, mock_sleep, mock_get):
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"vulnerabilities": [{"cve": {"metrics": {"cvssMetricV31": [{"cvssData": {"baseScore": 5.0}}]}}}]}
+        mock_get.return_value = mock_resp
+        mVuln.obtener_score_cvss("CVE-2024-2222")
+        mock_sleep.assert_called_with(6.0)
+
+    # --- 3. TESTS DE ERROR EN RED Y ROBUSTEZ ---
+
+    @patch('modules.vulns.session_http.get')
+    def test_obtener_score_cvss_error_nist(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=403)
+        score = mVuln.obtener_score_cvss("CVE-2024-9999")
+        self.assertEqual(score, 0.0)
+
+    @patch('modules.vulns.session_http.get')
+    def test_extraer_score_osv_profundo_404_con_fallback(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=404)
+        score_profundo = mVuln.extraer_score_osv_profundo("CVE-000", {})
+        self.assertIsNone(score_profundo)
+
+    @patch('modules.vulns.os.path.exists', return_value=True)
+    @patch('gzip.open')
+    def test_changelog_corrupto_no_detiene_analisis(self, mock_gzip, mock_exists):
+        mock_gzip.side_effect = Exception("Corrupto")
+        res = mVuln.cve_esta_en_changelog("roto", "CVE-2024")
+        self.assertFalse(res)
+
+    # --- 4. TESTS DE LIBRERÍA LOCAL Y INTEGRACIÓN ---
+
+    @patch('modules.vulns.LIBRERIA_CVSS', True)
+    @patch('modules.vulns.CVSS3')
+    def test_extraer_score_osv_desde_vector_local(self, mock_cvss3):
+        mock_cvss3.return_value.scores.return_value = [9.8]
+        vuln_data = {
+            "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]
+        }
+        score = mVuln.extraer_score_osv_profundo("CVE-2024-TEST", vuln_data)
+        self.assertEqual(score, 9.8)
+
+    @patch('modules.vulns.session_http.post')
+    @patch('modules.vulns.obtener_contexto_so', return_value={"año_corte": 2000})
+    def test_escanear_vulnerabilidades_lotes_grandes(self, mock_ctx, mock_post):
+        muchos_paquetes = [{'name': f'pkg{i}', 'version': '1.0', 'ecosystem': 'Debian', 'type': 'APT'} for i in range(201)]
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"results": []}
+        mock_post.return_value = mock_resp
+        mVuln.escanear_vulnerabilidades(muchos_paquetes)
+        self.assertEqual(mock_post.call_count, 2)
 
     @patch('modules.vulns.config', CONFIG_MOCK)
-    @patch('modules.vulns.requests.post')
-    def test_escanear_vulnerabilidades_sin_vulns(self, mock_post):
-        """Camino Feliz: La API responde 200 OK pero el paquete es seguro."""
-        
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"results": [{}]}
-        mock_post.return_value = mock_response
+    @patch('modules.vulns.mSystem.info_sis', return_value={'version': '12.0', 'dist': 'debian'})
+    @patch('modules.vulns.session_http.post')
+    @patch('modules.vulns.extraer_score_osv_profundo', return_value=7.5)
+    @patch('modules.vulns.es_falso_positivo_so', return_value=False)
+    def test_escanear_vulnerabilidades_flujo_completo(self, mock_fp, mock_osv_p, mock_post, mock_info):
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {
+            "results": [{
+                "vulns": [
+                    {"id": "CVE-1999-0001"}, 
+                    {"id": "CVE-2005-0001"}, # Ignorado por año si Debian 12
+                    {"id": "CVE-2024-0001"}
+                ]
+            }]
+        }
+        mock_post.return_value = mock_resp
+        resultados = mVuln.escanear_vulnerabilidades(self.paquete_apt)
+        self.assertEqual(len(resultados), 1)
+        self.assertEqual(resultados[0]['cves'][0]['id'], "CVE-2024-0001")
 
-        resultado = mVuln.escanear_vulnerabilidades(self.paquetes_mock)
-        self.assertEqual(resultado, [])
-
-
-    @patch('modules.vulns.config', CONFIG_MOCK)
-    @patch('modules.vulns.requests.post')
-    def test_escanear_vulnerabilidades_error_http(self, mock_post):
-        """Camino Triste: La API está saturada y devuelve un Error 500."""
-        
-        mock_response = MagicMock()
-        mock_response.status_code = 500 
-        mock_post.return_value = mock_response
-
-        resultado = mVuln.escanear_vulnerabilidades(self.paquetes_mock)
-        self.assertEqual(resultado, [])
-
-
-    @patch('modules.vulns.config', CONFIG_MOCK)
-    @patch('modules.vulns.requests.post')
-    def test_escanear_vulnerabilidades_fallo_conexion(self, mock_post):
-        """Camino Triste: El servidor no tiene internet (Timeout o ConnectionError)."""
-        
-        mock_post.side_effect = requests.exceptions.ConnectionError("Network is unreachable")
-        resultado = mVuln.escanear_vulnerabilidades(self.paquetes_mock)
-        
-        self.assertEqual(resultado, [])
-
+    @patch('modules.vulns.escanear_vulnerabilidades', return_value=[])
+    @patch('modules.system.paquetes_python', return_value=[{'name': 'requests', 'version': '2.0'}])
+    @patch('modules.system.paquetes_instalados', return_value=[])
+    def test_ESCANER_vulnerabilidades_integracion(self, mock_apt, mock_pip, mock_scan):
+        res = mVuln.ESCANER_vulnerabilidades(verbose=False)
+        self.assertIn("paquetes", res)
+        self.assertEqual(res["paquetes"]["pip"], 1)
+        mock_scan.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
