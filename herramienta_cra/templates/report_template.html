@@ -266,20 +266,28 @@
                 <span class="badge bg-danger mb-sm">{{ vuln.cantidad }} CVEs Detectados</span><br>
                 
                 <div class="vuln-list-container">
-                    {% for cve in vuln.cves[:5] %}
-                        • <strong>{{ cve.id }}</strong> 
-                        
-                        <span class="{% if cve.score >= 9.0 %}cvss-critical{% elif cve.score >= 7.0 %}cvss-high{% else %}cvss-medium{% endif %}">
-                            (CVSS: {{ cve.score }})
-                        </span><br>
-                    {% endfor %}
-                    
-                    {% if vuln.cves | length > 5 %}
-                        <span class="vuln-omitted-text">
-                            ...y {{ vuln.cves | length - 5 }} vulnerabilidades más omitidas.
-                        </span>
-                    {% endif %}
-                </div>
+    {% for cve in vuln.cves[:5] %}
+        • <strong>{{ cve.id }}</strong> 
+        
+        {# --- AQUÍ ESTÁ LA MAGIA --- #}
+        {% if cve.score == -1.0 %}
+            <span class="text-muted">
+                (CVSS: Desconocido)
+            </span><br>
+        {% else %}
+            <span class="{% if cve.score >= 9.0 %}cvss-critical{% elif cve.score >= 7.0 %}cvss-high{% else %}cvss-medium{% endif %}">
+                (CVSS: {{ cve.score }})
+            </span><br>
+        {% endif %}
+        
+    {% endfor %}
+    
+    {% if vuln.cves | length > 5 %}
+        <span class="vuln-omitted-text">
+            ...y {{ vuln.cves | length - 5 }} vulnerabilidades más omitidas.
+        </span>
+    {% endif %}
+</div>
             </td>
         </tr>
         {% else %}
@@ -1241,7 +1249,7 @@
     </table>
 
     {% if datos.disponibilidad.backups.huerfanos %}
-        <div class="info-box" style="margin-top: 10px; background-color: #e3f2fd; border-left-color: #3498db; color: #1e3a8a;">
+        <div class="info-box" style="margin-top: 10px; background-color: #e3f2fd; border-left-color: #3498db; color: #2c3e50;">
             <strong>¡Aviso de Configuración! Servicios Huérfanos Detectados:</strong> 
             Se han detectado unidades de servicio de backup instaladas pero sin ningún 'Timer' que ordene su ejecución automática. Los siguientes servicios deberán ejecutarse manualmente: 
             <span class="font-mono">{{ datos.disponibilidad.backups.huerfanos | join(', ') }}</span>.

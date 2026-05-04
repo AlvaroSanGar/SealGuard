@@ -26,15 +26,6 @@ def calcular_resumen_dinamico(datos):
         resumen.append({"nombre": "1. Exposición de Red", "estado": "PELIGRO", "clase": "bg-danger"})
         total_criticos += 1
 
-    # Vulnerabilidades
-    vulns = datos.get("vulns", [])
-    if len(vulns) == 0:
-        resumen.append({"nombre": "2. Vulnerabilidades", "estado": "SEGURO", "clase": "bg-safe"})
-        total_seguros += 1
-    else:
-        resumen.append({"nombre": "2. Vulnerabilidades", "estado": "PELIGRO", "clase": "bg-danger"})
-        total_criticos += 1
-
     # Integridad del Sistema
     integridad = datos.get("integridad", [])
     int_riesgos = [i for i in integridad if i.get("estado", "") != "INTACTO"]
@@ -129,8 +120,6 @@ def obtener_ruta_escritorio_real():
         if os.path.exists(variante_es): return variante_es
         return home_usuario
     return ruta_desktop
-
-
 
 
 def generar_informe(fecha, datos):    
