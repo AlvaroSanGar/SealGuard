@@ -26,6 +26,16 @@ def calcular_resumen_dinamico(datos):
         resumen.append({"nombre": "1. Exposición de Red", "estado": "PELIGRO", "clase": "bg-danger"})
         total_criticos += 1
 
+    # Vulnerabilidades
+    paquetes_vulnerables = datos.get("vulns", [])
+    
+    if len(paquetes_vulnerables) == 0:
+        resumen.append({"nombre": "2. Gestión de Vulnerabilidades", "estado": "SEGURO", "clase": "bg-safe"})
+        total_seguros += 1
+    else:
+        resumen.append({"nombre": "2. Gestión de Vulnerabilidades", "estado": "PELIGRO", "clase": "bg-danger"})
+        total_criticos += 1
+
     # Integridad del Sistema
     integridad = datos.get("integridad", [])
     int_riesgos = [i for i in integridad if i.get("estado", "") != "INTACTO"]

@@ -184,50 +184,54 @@
             estar deshabilitado. La presencia de servicios expuestos no autorizados (marcados como PROHIBIDO) representa una violación directa de este 
             principio.        
         </p>
-    {% if datos.puertos | length > 0 %}
-        {% for grupo in datos.puertos | groupby('ip') %}
-            
-            <div class="interface-header">
-                <strong>Dirección IP / Interfaz:</strong> {{ grupo.grouper }}
-            </div>
-            
-            <table class="data-table table-interface">
-                <tr>
-                    <th style="width: 15%;">Puerto</th>
-                    <th style="width: 30%;">Servicio y Detalles</th>
-                    <th style="width: 15%;">Estado</th>
-                    <th style="width: 25%;">Motivo</th>
-                    <th style="width: 15%;">Peligro</th>
-                </tr>
+{% for grupo in datos.puertos | groupby('ip') %}
+    
+    <div class="interface-header">
+        <strong>Dirección IP / Interfaz:</strong> {{ grupo.grouper }}
+    </div>
+    
+    <table class="data-table table-interface">
+        <tr>
+            <th style="width: 15%;">Puerto</th>
+            <th style="width: 30%;">Servicio y Detalles</th>
+            <th style="width: 15%;">Estado</th>
+            <th style="width: 25%;">Motivo</th>
+            <th style="width: 15%;">Peligro</th>
+        </tr>
+        
+        {# Comprobamos si esta interfaz solo tiene el puerto "falso" de relleno #}
+        {% if grupo.list[0].puerto == '-' %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 15px; color: #155724;">
+                    <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en esta interfaz.
+                </td>
+            </tr>
+        {% else %}
+            {# Si hay puertos de verdad, los pintamos normalmente #}
+            {% for puerto in grupo.list %}
+            <tr>
+                <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
+                <td>{{ puerto.detalle }}</td>
                 
-                {% for puerto in grupo.list %}
-                <tr>
-                    <td><strong>{{ puerto.puerto }}</strong> / {{ puerto.protocolo | upper }}</td>
-                    <td>{{ puerto.detalle }}</td>
-                    
-                    <td>
-                        <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
-                            {{ puerto.estado }}
-                        </span>
-                    </td>
-                    
-                    <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
-                    
-                    <td>
-                        <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
-                            {{ puerto.peligro }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-            
-        {% endfor %}
-    {% else %}
-        <div class="success-box">
-            <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en las interfaces auditadas.
-        </div>
-    {% endif %}
+                <td>
+                    <span class="badge {% if puerto.estado == 'PROHIBIDO' %}bg-danger{% elif puerto.estado == 'ACEPTADO' %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ puerto.estado }}
+                    </span>
+                </td>
+                
+                <td style="font-size: 8.5pt; color: #555;">{{ puerto.mensaje }}</td>
+                
+                <td>
+                    <span class="badge {% if puerto.peligro == 'ALTO' %}bg-danger{% elif puerto.peligro == 'BAJO' %}bg-safe{% else %}bg-warning{% endif %}">
+                        {{ puerto.peligro }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        {% endif %}
+    </table>
+    
+{% endfor %}
 
 <h2 class="subsection-title">2. Gestión de Vulnerabilidades</h2>
 

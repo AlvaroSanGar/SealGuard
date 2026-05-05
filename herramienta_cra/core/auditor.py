@@ -31,7 +31,7 @@ def seleccionar(mode, verbose):
 
         case "configure":
             opBBDD.mostrar_tabla("baseline")
-            id_str = input("[i] Seleccione el id del nuevo archivo baseline o pulse la tecla 'Q' para salir: ")
+            id_str = print_input("[i] Seleccione el id del nuevo archivo baseline o pulse la tecla 'Q' para salir: ")
             if id_str.lower() != 'q':
                 try:
                     id_baseline = int(id_str)
@@ -41,7 +41,7 @@ def seleccionar(mode, verbose):
         
         case "recover":
             opBBDD.mostrar_tabla("reportes")
-            id_str = input("[i] Seleccione el id del reporte que desea generar o pulse la tecla 'Q' para salir: ")
+            id_str = print_input("[i] Seleccione el id del reporte que desea generar o pulse la tecla 'Q' para salir: ")
             if id_str.lower() != 'q':
                 try:
                     id_reporte = int(id_str)
