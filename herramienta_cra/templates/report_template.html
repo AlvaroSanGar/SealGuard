@@ -246,9 +246,9 @@
         <h4 style="margin-top: 0; color: #d68910;">Nota sobre Falsos Positivos</h4>
         <p style="margin-bottom: 0;">
             Debido a cómo distribuciones como Ubuntu gestionan los parches de seguridad (<em>backporting</em>), es posible que la herramienta reporte Falsos 
-            Positivos en paquetes críticos (ej. <code>openssl</code>). La herramienta filtra automáticamente la mayoría cruzando datos con el SO local. Si 
-            detecta anomalías persistentes, verifique la versión con el <a href="https://ubuntu.com/security" target="_blank">Security Tracker oficial</a> e 
-            incluya el CVE descartado en la whitelist de la herramienta dentro del archivo controls.yaml (<code>vulnerabilities/ignorar</code>).
+            Positivos en paquetes críticos (ej. <code>openssl</code>). La herramienta filtra automáticamente la mayoría cruzando datos con la API OSV.dev, el SO local
+            y los Security Trackers de Ubuntu y Debian. Si detecta anomalías persistentes, verifique la versión e incluya el CVE descartado en la whitelist de la 
+            herramienta dentro del archivo controls.yaml (<code>vulnerabilities/ignorar</code>).
         </p>
     </div>
     
@@ -273,7 +273,6 @@
     {% for cve in vuln.cves[:5] %}
         • <strong>{{ cve.id }}</strong> 
         
-        {# --- AQUÍ ESTÁ LA MAGIA --- #}
         {% if cve.score == -1.0 %}
             <span class="text-muted">
                 (CVSS: Desconocido)
@@ -469,15 +468,15 @@
     {# Obtenemos la info de sshd de forma segura con .get() #}
     {% set info_sshd = datos['2FA'].servicios.get('sshd') %}
     
-    {# 1º Comprobamos si directamente el servicio no existe #}
+    {# Comprobamos si directamente el servicio no existe #}
     {% if info_sshd and "Servicio no detectado en el sistema" in info_sshd.detalles %}
         <div class="info-box"><strong>Configuración SSH:</strong> El servicio SSH no está instalado en el sistema, por lo que no se le puede aplicar MFA.</div>
         
-    {# 2º Si existe, evaluamos si la configuración es válida #}
+    {# Si existe, evaluamos si la configuración es válida #}
     {% elif datos['2FA'].ssh_config_valido %}
         <div class="success-box"><strong>Configuración SSH:</strong> El servicio SSH está configurado correctamente para permitir y exigir métodos de autenticación múltiple.</div>
         
-    {# 3º Si existe pero está mal configurado #}
+    {# Si existe pero está mal configurado #}
     {% else %}
         <div class="alert-box"><strong>Configuración SSH:</strong> Se han detectado discrepancias en <code>sshd_config</code> que podrían impedir la aplicación efectiva del MFA.</div>
     {% endif %}

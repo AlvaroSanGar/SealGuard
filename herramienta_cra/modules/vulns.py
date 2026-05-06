@@ -239,42 +239,26 @@ def cve_parcheado_ubuntu(cve_id, nombre_paquete, version_instalada):
 ####################################################################################################################################################################
 
 def cargar_debian_tracker():
-    """
-    Descarga el JSON completo del Debian Security Tracker una sola vez
-    y lo guarda en cache_debian_tracker.
-
-    Estructura del JSON de Debian:
-    {
-      "package_name": {
-        "CVE-XXXX-XXXX": {
-          "releases": {
-            "bookworm": {
-              "status": "resolved" | "open" | "undetermined",
-              "fixed_version": "1.2.3"
-            }
-          }
-        }
-      }
-    }
-    """
+    # El tracker de Debian no es una API, es un archivo JSON, por ello debemos 
     global _debian_cargado
 
+    # Nos asseguramos de que solo haya 1 hilo que descargue el JSON, bloqueamos el resto
     with _debian_tracker_lock:
         if _debian_cargado:
             return True
 
         try:
-            print_c("[i] Descargando Debian Security Tracker (~50MB), espere...")
+            print_c("   [i] Descargando Debian Security Tracker (50MB), espere...")
             r = requests.get(DEBIAN_TRACKER, timeout=60)
 
             if r.status_code != 200:
-                print_c(f"[WARN] Debian Security Tracker devolvió {r.status_code}")
+                print_c(    "[!] Debian Security Tracker devolvió "+str(r.status_code))
                 return False
 
             datos = r.json()
 
-            # Reindexar por CVE → paquete para búsquedas O(1)
-            # cache_debian_tracker[cve_id][pkg_name] = status_info
+            # Debemos reorganizar el diccionario ya que en el JSON de debian la estructura es "paquete": [CVE1, CVE2], en nuestro caso como miramos por CVE, le damos 
+            # la vuelta, finalmente vemos el estado al igual que en Ubuntu
             for pkg_name, cves in datos.items():
                 for cve_id, cve_info in cves.items():
                     if cve_id not in cache_debian_tracker:
@@ -283,38 +267,47 @@ def cargar_debian_tracker():
                     cache_debian_tracker[cve_id][pkg_name] = releases
 
             _debian_cargado = True
-            print_c(f"[i] Debian Security Tracker cargado ({len(cache_debian_tracker)} CVEs indexados)")
+            print_c("   [Ok] Debian Security Tracker cargado ("+str(len(cache_debian_tracker))+" CVEs indexados)")
             return True
 
         except Exception as e:
-            print_c(f"[WARN] No se pudo cargar el Debian Security Tracker: {e}")
+            print_c("   [!] No se pudo cargar el Debian Security Tracker: "+str(e))
             return False
 
 
-def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
-    """
-    Consulta el Debian Security Tracker (ya cargado en memoria).
 
-    Retorna:
-        True  → resuelto en esta release (descartar)
-        False → sigue abierto
-        None  → sin información (conservar por precaución)
-    """
+
+
+
+
+
+
+
+
+
+def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
+    # Vamos a hacer una serie de comprobaciones
+
+    # No se ha cargado el tracker de Debian
     if not _debian_cargado:
         return None
 
+    # El CVE no existe en el Tracker
     paquetes = cache_debian_tracker.get(cve_id)
     if not paquetes:
         return None
 
+    # El CVE no afecta al paquete
     releases = paquetes.get(nombre_paquete)
     if not releases:
         return None
 
+    # No hay información de nuestra versión (realese)
     info_release = releases.get(CODENAME_TRACKER)
     if not info_release:
         return None
 
+    # Catalogamos el estado 
     status = info_release.get("status", "")
 
     if status == "not-affected":
@@ -340,15 +333,27 @@ def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
     return None
 
 
-# -------------------------------
-# DISPATCHER DE TRACKER
-# -------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################################################################################################
+################### Dispatcher ###################################################################################################################################
+##################################################################################################################################################################
 
 def cve_parcheado(cve_id, nombre_paquete, version_instalada):
-    """
-    Punto de entrada único para comprobar si un CVE está parcheado.
-    Delega al tracker correspondiente según la distro detectada.
-    """
+    # Simplemente se encarga de mandarle el código a el tracker de Ubuntu o al de Debian, separa todo para hacerlo más fácil de entender
     if TIPO_TRACKER == "ubuntu":
         return cve_parcheado_ubuntu(cve_id, nombre_paquete, version_instalada)
     if TIPO_TRACKER == "debian":
@@ -356,16 +361,37 @@ def cve_parcheado(cve_id, nombre_paquete, version_instalada):
     return None
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ####################################################################################################################################################################
 ########### Operaciones OSV.dev ####################################################################################################################################
 ####################################################################################################################################################################
 
 def comparar_versiones_nativa(v_instalada, v_fixed):
+    # Simplemente comparamos la versión de un paquete con la versión arreglada del mismo para comprobar si es anterior o posterior, hacemos aquí el import por si acaso
     try:
         import apt_pkg
         apt_pkg.init_system()
         return apt_pkg.version_compare(v_instalada, v_fixed) >= 0
+    
     except Exception:
+        # Es menos optimo que con apt_package pero funciona en todos los sistemas debdian
         res = subprocess.run(
             ['dpkg', '--compare-versions', v_instalada, 'ge', v_fixed],
             stdout=subprocess.DEVNULL,
@@ -374,12 +400,30 @@ def comparar_versiones_nativa(v_instalada, v_fixed):
         return res.returncode == 0
 
 
+
+
+
+
+
+
+
+
+
+
 def parse_vector(data):
+    
+    # Obtenemos el CVSS del paquete, como OSV tiene varias formas de mandarlo comprobamos todaas ellas
+
+    # Viene directamente la vuln con su CVSS en el campo severity del JSON respuesta
     if "severity" in data:
         for sev in data["severity"]:
             score = sev.get("score")
+            
+            # Caso de que venga directamente en formato númerico (1.0, 4.2...)
             if isinstance(score, (int, float)):
                 return float(score)
+            
+            # Caso de que venga en formato de CVSS, es obligatorio que usemos la librería para obtenerlo
             if isinstance(score, str) and LIBRERIA_CVSS:
                 try:
                     if "CVSS:3" in score:
@@ -389,6 +433,7 @@ def parse_vector(data):
                 except Exception:
                     pass
 
+    # El campo severity viene vacío, puede estar en database_specific (no es normal pero puede ser)
     db = data.get("database_specific", {})
     try:
         if "nvd_cvss3" in db:
@@ -401,59 +446,126 @@ def parse_vector(data):
     except Exception:
         pass
 
+    # Si finalmente no se encuentra nada, devolvemos None (esto más adelante se interpreta como -1 y en el reporte final se traduce como desconocido)
     return None
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def obtener_score_con_cache(vid, v_data, sesion):
-    with _cache_lock:
+    # Tratamos de obtener el resultado en la caché de CVEs para no realizar una petición a OSV.dev (esto nos permite optimizar enormemente el proceso en tiempo)
+    with _cache_lock: # Bloqueamos pq accedemos a la caché temporal
         if vid in cache_detalles_osv:
             return cache_detalles_osv[vid]
 
+    # Tratamos de obtener el CVE del propio vector de datos
     score = parse_vector(v_data)
 
+    # Si en este punto no hemos obtenido la info consultamos la API de OSV.dev
     if score is None:
         try:
             r = sesion.get(OSV_VULN_URL.format(vid), timeout=TIMEOUT)
             if r.status_code == 200:
+                
+                # Sacamos el CVSS
                 score = parse_vector(r.json())
         except Exception:
             pass
 
     resultado = {"score": score, "data": v_data}
+    
+    # Guardamos el resultado en la caché, de forma que si otro paquete tiene el mismo CVE, como en el JSON indexamos con el CVE lo podremos localizar y no será neesario el 
+    # volver a hacer una petición a la API (lo que explicabamos arriba)
     with _cache_lock:
         cache_detalles_osv[vid] = resultado
 
     return resultado
 
 
+
+
+
+
+
+
+
+
+
+def normalizar(valor):
+    # Como OSV nos devuelve los CVEs con un formato variable (no siempre empieza igual, ya que cambia mucho en función del entorno)
+    
+    # En este caso el CVE viene correctamente y lo devolvemos tal cual
+    if valor.startswith("CVE-"):
+        return valor
+    
+    # En caso de que venga con el entorno delante, quitamos el prefijo
+    for prefijo in ("DEBIAN-CVE-", "UBUNTU-CVE-"):
+        if valor.startswith(prefijo):
+            return valor.replace(prefijo, "CVE-", 1)
+        
+    # Ignoramos todo lo que no venga en formato CVE
+    return None
+
+
 def obtener_cves_reales(v):
+    # Guardamos el CVE en un set para evitar repetidos (esto se debe a que pueden haber repetidos juntando id y alias)
     cves = set()
 
-    def normalizar(valor):
-        if valor.startswith("CVE-"):
-            return valor
-        for prefijo in ("DEBIAN-CVE-", "UBUNTU-CVE-"):
-            if valor.startswith(prefijo):
-                return valor.replace(prefijo, "CVE-", 1)
-        return None
-
+    # Cogemos el CVE que nos ha devuelto OSV y lo normalizamos,
     cve = normalizar(v.get("id", ""))
     if cve:
         cves.add(cve)
 
+    # La API muchas veces manda los CVEs en alias
     for alias in v.get("aliases", []):
         cve = normalizar(alias)
         if cve:
             cves.add(cve)
-
+    # Lo devolvemos en formato de lista ya que es mucho más fácil para trabajar y ya sabemos que no tenemos duplicados
     return list(cves)
 
 
+
+
+
+
+
+
+
+
+
+
+
 def es_falso_positivo_so(version_instalada, vuln_data):
-    for affected in vuln_data.get("affected", []):
+    # El JSON que recibimos de OSV contiene el parámetro affected, el cual indica los entornos en los que afecta la vuln así como el paquete([{bash, Debian},{bash, Kali}]) con
+    # una lista de diccionarios (realmente una profundidad de 2 diccionarios pero no importa para la explicación)
+    
+    # Miramos cada entrada de affected
+    for affected in vuln_data.get("affected", []):        
+        # Miramos las versiones vulnerables
         for r in affected.get("ranges", []):
+            # Nos aseguramos que realmente es una versión "correcta" (si no se pone puede explotar pq lleguen cosas raras)
             if r.get("type") not in ("ECOSYSTEM", "SEMVER"):
                 continue
+
+            # Buscamos en el quivalente al control de cambios que da OSV hasta que pillamos la versión que parchea la vuln, después comprobamos si nuestra versión
+            # es igual o superior a la del parche
             for event in r.get("events", []):
                 if "fixed" in event:
                     if comparar_versiones_nativa(version_instalada, event["fixed"]):
@@ -461,56 +573,110 @@ def es_falso_positivo_so(version_instalada, vuln_data):
     return False
 
 
+
+
+
+
+
+
+##################################################################################################################################################################
+################### Consultas y peticiones #######################################################################################################################
+##################################################################################################################################################################
+
 def post_con_reintentos(sesion, url, payload):
+    # Vamos a hacer las peticiones con un sistema de backoff, vamos a reenviar las peticiones siempre que no se exceda el max num de intentos
     for intento in range(MAX_REINTENTOS):
         try:
+            # realizamos la petición
             r = sesion.post(url, json=payload, timeout=TIMEOUT)
+
+            # Si la API responde correctamente, devolvemos directamente el paquete que hemos recibido
             if r.status_code == 200:
                 return r.json()
+            
+            # En caso de que haya un fallo DE PARTE DEL CLIENTE, no lo volvemos a intentar, ya que muy probablemente va a volver a fallar (el fallo es nuetro) 
             if r.status_code < 500:
-                print_c(f"[WARN] OSV devolvió {r.status_code}, lote descartado")
+                print_c("  [!] OSV devolvió "+str(r.status_code)+", lote descartado")
                 return None
+            
+        # Si la petición falla, aborta y vuelve a mandar el paquete
         except requests.exceptions.RequestException as e:
-            print_c(f"[WARN] Intento {intento + 1}/{MAX_REINTENTOS} fallido: {e}")
+            print_c("  [!] Intento "+str(int(intento + 1))+"/"+MAX_REINTENTOS+" fallido: "+str(e))
+        
+        # Si hay un fallo del servidor el hilo espera antes de volver a mandar un apetición para no sobresaturar el servidor (el tiempo de espera es exponencial)
         time.sleep(2 ** intento)
-    print_c("[ERROR] Lote descartado tras agotar reintentos")
+    print_c("   [ERROR] Lote descartado tras agotar reintentos")
     return None
+
+
+
+
+
+
+
+
 
 
 def construir_consultas_apt(paquetes_apt):
     consultas = []
     meta = []
+
+    # Recorremos todos los paquetes del sistema
     for p in paquetes_apt:
         for ecosistema in ECOSISTEMAS_SO:
+            # Para los ecosistemas encontrados (pueden ser Debian o Ubuntu y Debian) preparamos un paquete donde guardamos el paquete con su entorno y su versión
             consultas.append({
                 "package": {"name": p["name"], "ecosystem": ecosistema},
                 "version": p["version"]
             })
+
+            # Por limitaciones de la API, no nos devuelve la respuesta indicando el paquete de envío, por lo que clonamos el diccionario para saber a que petición pertenece que respuesta
             meta.append({**p, "ecosystem": ecosistema})
     return consultas, meta
 
 
-def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
-    min_cvss        = float(cfg_vulns.get("min_cvss_score", 0.0))
-    lista_ignorados = set(cfg_vulns.get("ignorar", []))
-    usar_tracker    = TIPO_TRACKER is not None
 
+
+
+
+
+
+
+
+
+##################################################################################################################################################################
+################### Resultados ###################################################################################################################################
+##################################################################################################################################################################
+
+def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
+    
+    # Recolectamos varias variables y preparamos todo
+    min_cvss = float(cfg_vulns.get("min_cvss_score", 0.0))
+    lista_ignorados = set(cfg_vulns.get("ignorar", []))
+    usar_tracker = TIPO_TRACKER is not None
+
+    # Aquí vamos a acumular los CVEs con sus paquetes
     acumulador = {}
 
+    # Como la API no nos devuelve el paquete al que está contestando pero si contesta en el mismo orden de envío, vamos a usar enumerate, de esta forma con nuestra
+    # lista de paquetes meta vamos a obtener el paquete al que hace referencia cada vulnerabilidad, es decir vamos recorriendo meta y res de forma simultanea y mapeando
+    # a cada paquete su vulnerabilidad
     for index, res in enumerate(resultados_osv):
+
+        # Si la respuesta no tiene vulnerabilidades pasamos al siguiente paquete de la respuesta
         if "vulns" not in res:
             continue
 
-        pkg   = paquetes_meta[index]
+        pkg = paquetes_meta[index]
         clave = pkg["name"]
 
         if clave not in acumulador:
             acumulador[clave] = {
-                "paquete":     pkg["name"],
-                "version":     pkg["version"],
-                "tipo":        pkg["type"],
+                "paquete": pkg["name"],
+                "version": pkg["version"],
+                "tipo": pkg["type"],
                 "cves_vistos": set(),
-                "cves":        []
+                "cves": []
             }
 
         for v in res["vulns"]:
@@ -518,9 +684,9 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
             if not cves_reales:
                 continue
 
-            vid     = v["id"]
-            cached  = obtener_score_con_cache(vid, v, sesion)
-            v_full  = cached["data"]
+            vid = v["id"]
+            cached = obtener_score_con_cache(vid, v, sesion)
+            v_full = cached["data"]
             score_b = cached["score"]
 
             # Capa 1: versión fixed en OSV
@@ -567,6 +733,16 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
     return hallazgos
 
 
+
+
+
+
+
+
+
+
+
+
 def trabajador_lote(lote_info):
     consultas_lote, meta_lote, cfg_vulns = lote_info
     sesion = requests.Session()
@@ -574,6 +750,15 @@ def trabajador_lote(lote_info):
     if not data:
         return []
     return procesar_resultados_batch(data.get("results", []), meta_lote, cfg_vulns, sesion)
+
+
+
+
+
+
+
+
+
 
 
 def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
@@ -618,7 +803,21 @@ def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
     return list(vistos.values())
 
 
-########### ESCANER ###############################################################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################################################################################################
+################### Escaner ######################################################################################################################################
+##################################################################################################################################################################
 
 def ESCANER_vulnerabilidades(verbose):
     mostrar_subtitulos("Vulnerabilidades")
@@ -626,17 +825,17 @@ def ESCANER_vulnerabilidades(verbose):
     print_c("[+] Iniciando módulo de escaneo de vulnerabilidades")
 
     if not ECOSISTEMAS_SO:
-        print_c("[!] Distribución de Linux no compatible (no es de la familia Debian/Ubuntu). No se puede ejecutar el módulo")
+        print_c("   [!] Distribución de Linux no compatible (no es de la familia Debian/Ubuntu). No se puede ejecutar el módulo")
         return {"paquetes": {"apt": 0, "pip": 0}, "vulns": []}
 
     # Inicializar tracker según distro
     if TIPO_TRACKER == "ubuntu":
-        print_c("[i] Ubuntu Security Tracker activo (codename: "+CODENAME_TRACKER+")")
+        print_c("   [i] Ubuntu Security Tracker activo (codename: "+CODENAME_TRACKER+")")
     elif TIPO_TRACKER == "debian":
-        print_c("[i] Debian Security Tracker activo (codename: "+CODENAME_TRACKER+")")
+        print_c("   [i] Debian Security Tracker activo (codename: "+CODENAME_TRACKER+")")
         cargar_debian_tracker()  # descarga única antes del escaneo
     else:
-        print_c("   [!] No hay Security Tracker disponible para esta distro")
+        print_c("   [!] No hay Security Tracker disponible para esta distribución")
 
     if not LIBRERIA_CVSS:
         print_c("   [!] Instala cvss en el entorno virtual, ya que la instalación falló: pip install cvss")

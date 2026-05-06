@@ -218,7 +218,6 @@ ul { margin-top: 5px; padding-left: 20px; }
     color: var(--navy-blue);
 }
 
-/* Magia de WeasyPrint: Pone los puntitos y el número de página automáticamente */
 .toc-list a::after {
     content: leader('.') target-counter(attr(href), page);
     color: #7f8c8d;
