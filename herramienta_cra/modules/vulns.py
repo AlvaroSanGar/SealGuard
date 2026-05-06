@@ -24,7 +24,7 @@ cache_detalles_osv   = {}
 cache_ubuntu_tracker = {}
 
 # cargado una vez en memoria, es un diccionario de 50 MB que tiene todos los parches de seguridad del ecosistema Debian, no hacemos como en Ubuntu ya que no hay una API
-cache_debian_tracker = {} 
+cache_debian_tracker = {}
 
 # Diseñado para optimizar el código, protege los hilos en condiciones de carrera (lectura y escritura simultanea)
 _cache_lock          = threading.Lock()
@@ -60,25 +60,22 @@ FAMILIAS_DEBIAN = {
 
 
 
+
+
+
+
+
 ############ Detección de distro #####################################################################################################################################
 def detectar_info_distro():
-    """
-    Lee /etc/os-release y determina:
-      - Si la distro es de la familia Debian/Ubuntu
-      - Qué ecosistemas usar en OSV
-      - Si usar el Ubuntu Security Tracker (y con qué codename)
-      - Si usar el Debian Security Tracker
-      - Qué tipo de tracker aplica ('ubuntu', 'debian', None)
-    """
     info = {
         "ID": "",
         "ID_LIKE": "",
         "VERSION_CODENAME": "",
-        "UBUNTU_CODENAME": "",  # Aparece en los SOs deribados de Ubuntu
+        "UBUNTU_CODENAME": "",  # Aparece en los SOs derivados de Ubuntu
     }
 
     # Leemos el archivo release, donde aparece la info del SO (similar a info_sis), para evitar problemas eliminamos espacios, dividimos el string en 2 partes y nos quedamos
-    # con la segunda (donde aparece el valor para cada atributo y finalmente ponemos todo en minúsculas
+    # con la segunda (donde aparece el valor para cada atributo), le quitamos las comillas al valor (si las tiene) y finalmente ponemos todo en minúsculas
     try:
         with open("/etc/os-release") as f:
             for line in f:
@@ -89,32 +86,29 @@ def detectar_info_distro():
         pass
 
     distro_id = info["ID"]
-    # ID_LIKE puede tener varios valores: "ubuntu debian", "debian ubuntu"...
-    id_like = set(info["ID_LIKE"].split())
+    id_like = set(info["ID_LIKE"].split())  # ID_LIKE puede tener varios valores: "ubuntu debian", "debian ubuntu"...
     codename = info["VERSION_CODENAME"]
     ubuntu_code = info["UBUNTU_CODENAME"]
 
     todas_ids = {distro_id} | id_like
 
     # Comprobar si pertenece a la familia Debian
-    es_familia_debian = bool(todas_ids & FAMILIAS_DEBIAN)
-
-    if not es_familia_debian:
-        # Distro no reconocida como Debian/Ubuntu — no usamos trackers
+    if not todas_ids & FAMILIAS_DEBIAN:
+        # No es una distro cubierta en el código, así que no vamos a usar los trackers
         return [], None, None, None
 
-    # Determinar si es rama Ubuntu o rama Debian pura
+    # Vamos a comprobar si la distro es una subversión de Ubuntu
     es_ubuntu = "ubuntu" in todas_ids
     es_debian  = "debian" in todas_ids and not es_ubuntu
 
-    # Ecosistemas OSV
+    # Determinamos qué ecosistemas le vamos a pasar a la API de OSV
     if es_ubuntu:
         ecosistemas = ["Ubuntu", "Debian"]
     else:
         ecosistemas = ["Debian"]
 
     # Codename para Ubuntu Security Tracker
-    # Mint y derivadas exponen UBUNTU_CODENAME con el codename real de Ubuntu base
+    # Las subversiones de Ubuntu tienen el parámetro codename_ubuntu en el archivo /etc/os-release, donde se indica la versión de ubuntu en la que se basan
     codename_ubuntu = ubuntu_code or (codename if es_ubuntu else None)
 
     # Tipo de tracker a usar
@@ -135,40 +129,77 @@ ECOSISTEMAS_SO, TIPO_TRACKER, CODENAME_TRACKER, DISTRO_ID = detectar_info_distro
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ####################################################################################################################################################################
 ########### Security tracker Ubuntu ################################################################################################################################
 ####################################################################################################################################################################
 
-def cve_parcheado_ubuntu(cve_id, nombre_paquete):
-    """
-    Consulta el Ubuntu Security Tracker para un CVE concreto.
-
-    Retorna:
-        True  → parcheado en esta release (descartar)
-        False → sigue vulnerable
-        None  → sin información (conservar por precaución)
-    """
+def cve_parcheado_ubuntu(cve_id, nombre_paquete, version_instalada):
+    # Creamos esta clave en vez de usar directamente el CVE, ya que un mismo CVE puede ir asociado a varios paquetes, por lo que debemos diferenciarlos
     clave = f"{cve_id}::{nombre_paquete}"
+
+    # Como por motivos de optimización vamos a usar múltiples hilos en el sistema, por ello necesitamos usar el _cache_lock, para que no se produzcan errores de sincronización
     with _cache_lock:
+        # Comprobamos que no se haya comprobado anteriormente el par CVE:paquete que estamos analizando, en cuyo caso no hacemos la consulta al tracker y simplemente devolvemos
+        # el valor ya obtenido
         if clave in cache_ubuntu_tracker:
             return cache_ubuntu_tracker[clave]
 
     resultado = None
     try:
+        # Metemos el CVE específico en la url de la petición y la realizamos (GET)
         r = requests.get(UBUNTU_TRACKER.format(cve_id), timeout=TIMEOUT)
 
         if r.status_code == 200:
             for pkg_info in r.json().get("packages", []):
+                # Buscamos el nombre del paquete que le hemos mandado
                 if pkg_info.get("name") != nombre_paquete:
                     continue
+
                 for s in pkg_info.get("statuses", []):
+                    # Una vez hemos hayado el paquete, buscamos la versión de Ubuntu en la que se basa el SO 
                     if s.get("release_codename") != CODENAME_TRACKER:
                         continue
                     status = s.get("status", "")
-                    if status in ("released", "not-affected", "ignored"):
+                    
+                    ####### CATALOGAMOS LOS POSIBLES ESTADOS QUE PUEDE TENER EL PAQUETE #############################################################################
+                    # Estos estados no dependen de versión, los descartamos directamente
+                    if status in ("not-affected", "ignored"):
                         resultado = True
+
+                    elif status == "released":
+                        # Existe un parche que resuelve la vulnerabilidad, comprobamos si está instalado
+                        version_fix = s.get("fixed_version", "")
+                        if version_fix:
+                            if comparar_versiones_nativa(version_instalada, version_fix):
+                                # La versión instalada ya incluye el fix → falso positivo
+                                resultado = True
+                            else:
+                                # El parche existe pero el usuario no lo ha instalado → sigue vulnerable
+                                resultado = False
+                        else:
+                            # No hay versión de fix disponible, lo descartamos por precaución
+                            resultado = True
+
+                    # Es vulnerable y no ha sido parcheado aún, lo consideramos como peligroso
                     elif status in ("needed", "deferred", "pending"):
                         resultado = False
+
                     break
                 if resultado is not None:
                     break
@@ -183,10 +214,29 @@ def cve_parcheado_ubuntu(cve_id, nombre_paquete):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ####################################################################################################################################################################
 ########### Security tracker Debian ################################################################################################################################
 ####################################################################################################################################################################
-
 
 def cargar_debian_tracker():
     """
@@ -241,7 +291,7 @@ def cargar_debian_tracker():
             return False
 
 
-def cve_parcheado_debian(cve_id, nombre_paquete):
+def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
     """
     Consulta el Debian Security Tracker (ya cargado en memoria).
 
@@ -267,8 +317,23 @@ def cve_parcheado_debian(cve_id, nombre_paquete):
 
     status = info_release.get("status", "")
 
-    if status in ("resolved", "not-affected"):
+    if status == "not-affected":
         return True
+
+    if status == "resolved":
+        # Capa 0: el parche existe en Debian, comprobamos si el usuario lo tiene instalado
+        version_fix = info_release.get("fixed_version", "")
+        if version_fix:
+            if comparar_versiones_nativa(version_instalada, version_fix):
+                # La versión instalada ya incluye el fix → falso positivo
+                return True
+            else:
+                # El parche existe pero el usuario no lo ha instalado → sigue vulnerable
+                return False
+        else:
+            # No hay versión de fix disponible, descartamos por precaución
+            return True
+
     if status in ("open", "undetermined"):
         return False
 
@@ -279,29 +344,21 @@ def cve_parcheado_debian(cve_id, nombre_paquete):
 # DISPATCHER DE TRACKER
 # -------------------------------
 
-def cve_parcheado(cve_id, nombre_paquete):
+def cve_parcheado(cve_id, nombre_paquete, version_instalada):
     """
     Punto de entrada único para comprobar si un CVE está parcheado.
     Delega al tracker correspondiente según la distro detectada.
     """
     if TIPO_TRACKER == "ubuntu":
-        return cve_parcheado_ubuntu(cve_id, nombre_paquete)
+        return cve_parcheado_ubuntu(cve_id, nombre_paquete, version_instalada)
     if TIPO_TRACKER == "debian":
-        return cve_parcheado_debian(cve_id, nombre_paquete)
+        return cve_parcheado_debian(cve_id, nombre_paquete, version_instalada)
     return None
-
-
-
-
-
-
-
 
 
 ####################################################################################################################################################################
 ########### Operaciones OSV.dev ####################################################################################################################################
 ####################################################################################################################################################################
-
 
 def comparar_versiones_nativa(v_instalada, v_fixed):
     try:
@@ -404,10 +461,6 @@ def es_falso_positivo_so(version_instalada, vuln_data):
     return False
 
 
-# -------------------------------
-# PETICIÓN AL BATCH CON REINTENTOS
-# -------------------------------
-
 def post_con_reintentos(sesion, url, payload):
     for intento in range(MAX_REINTENTOS):
         try:
@@ -424,10 +477,6 @@ def post_con_reintentos(sesion, url, payload):
     return None
 
 
-# -------------------------------
-# CONSULTA MULTI-ECOSISTEMA (APT)
-# -------------------------------
-
 def construir_consultas_apt(paquetes_apt):
     consultas = []
     meta = []
@@ -440,10 +489,6 @@ def construir_consultas_apt(paquetes_apt):
             meta.append({**p, "ecosystem": ecosistema})
     return consultas, meta
 
-
-# -------------------------------
-# PROCESADO DE RESULTADOS
-# -------------------------------
 
 def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
     min_cvss        = float(cfg_vulns.get("min_cvss_score", 0.0))
@@ -497,9 +542,9 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
                 if cve_id in acumulador[clave]["cves_vistos"]:
                     continue
 
-                # Capa 2: Security Tracker (Ubuntu o Debian según distro)
+                # Capa 2 + Capa 0: Security Tracker con comparación de versión instalada
                 if usar_tracker and pkg["type"] == "System (APT)":
-                    if cve_parcheado(cve_id, pkg["name"]) is True:
+                    if cve_parcheado(cve_id, pkg["name"], pkg["version"]) is True:
                         continue
 
                 acumulador[clave]["cves_vistos"].add(cve_id)
@@ -522,10 +567,6 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
     return hallazgos
 
 
-# -------------------------------
-# HILO DE TRABAJO
-# -------------------------------
-
 def trabajador_lote(lote_info):
     consultas_lote, meta_lote, cfg_vulns = lote_info
     sesion = requests.Session()
@@ -534,17 +575,6 @@ def trabajador_lote(lote_info):
         return []
     return procesar_resultados_batch(data.get("results", []), meta_lote, cfg_vulns, sesion)
 
-
-
-
-
-
-
-
-
-
-
-######### ES
 
 def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
     cfg_vulns = config.get("vulnerabilities", {})
@@ -588,14 +618,6 @@ def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
     return list(vistos.values())
 
 
-
-
-
-
-
-
-
-
 ########### ESCANER ###############################################################################################################################################
 
 def ESCANER_vulnerabilidades(verbose):
@@ -604,38 +626,30 @@ def ESCANER_vulnerabilidades(verbose):
     print_c("[+] Iniciando módulo de escaneo de vulnerabilidades")
 
     if not ECOSISTEMAS_SO:
-        print_c("[!] Distro no compatible (no es de la familia Debian/Ubuntu). Módulo desactivado.")
+        print_c("[!] Distribución de Linux no compatible (no es de la familia Debian/Ubuntu). No se puede ejecutar el módulo")
         return {"paquetes": {"apt": 0, "pip": 0}, "vulns": []}
-
-    print_c(f"[i] Distro detectada: {DISTRO_ID}")
-    print_c(f"[i] Ecosistemas OSV: {', '.join(ECOSISTEMAS_SO)}")
 
     # Inicializar tracker según distro
     if TIPO_TRACKER == "ubuntu":
-        print_c(f"[i] Ubuntu Security Tracker activo (codename: {CODENAME_TRACKER})")
+        print_c("[i] Ubuntu Security Tracker activo (codename: "+CODENAME_TRACKER+")")
     elif TIPO_TRACKER == "debian":
-        print_c(f"[i] Debian Security Tracker activo (codename: {CODENAME_TRACKER})")
+        print_c("[i] Debian Security Tracker activo (codename: "+CODENAME_TRACKER+")")
         cargar_debian_tracker()  # descarga única antes del escaneo
     else:
-        print_c("[!] No hay Security Tracker disponible para esta distro")
+        print_c("   [!] No hay Security Tracker disponible para esta distro")
 
     if not LIBRERIA_CVSS:
-        print_c("[!] Instala cvss: pip install cvss")
+        print_c("   [!] Instala cvss en el entorno virtual, ya que la instalación falló: pip install cvss")
 
     p_apt = mSystem.paquetes_instalados()
     p_pip = mSystem.paquetes_python()
 
-    print_c(f"[i] Paquetes detectados del sistema (APT): {len(p_apt)}")
-    print_c(f"[i] Paquetes detectados de python (PIP): {len(p_pip)}")
-    print_c(f"[i] Consultas totales a OSV: {len(p_apt) * len(ECOSISTEMAS_SO) + len(p_pip)}")
+    print_c("   [i] Paquetes detectados del sistema (APT): " + str(len(p_apt)))
+    print_c("   [i] Paquetes detectados de python (PIP): " + str(len(p_pip)))
 
-    inicio     = time.time()
     resultados = escanear_vulnerabilidades(p_apt, p_pip)
-    fin        = time.time()
-
-    print_c(f"[+] Se han encontrado {len(resultados)} paquetes vulnerables")
-    print_c(f"[i] Tiempo de escaneo: {fin - inicio:.2f}s")
-
+    print_c("  [i] Se han encontrado " + str(len(resultados)) + " paquetes vulnerables")
+    print_c("[-] Finalizando módulo de escaneo de vulnerabilidades")
     return {
         "paquetes": {"apt": len(p_apt), "pip": len(p_pip)},
         "vulns": resultados

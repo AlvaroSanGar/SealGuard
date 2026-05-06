@@ -84,7 +84,7 @@ def paquetes_instalados():
     query = "SELECT name, version FROM deb_packages;"
     resultado = ejecutar_consulta(query)
     for p in resultado:
-        # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
+        # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns, aunque el de ecosistem lo vamos a ignorar
         p['ecosystem'] = 'Debian'
         p['type'] = 'System (APT)'
     return resultado
