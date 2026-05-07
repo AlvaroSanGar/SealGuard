@@ -236,10 +236,10 @@
 <h2 class="subsection-title">2. Gestión de Vulnerabilidades</h2>
 
     <p class="cra-context-text">
-        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>«sin vulnerabilidades aprovechables conocidas»</em>. 
-        Adicionalmente, la <strong>Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto así como a abordar y subsanar dichas vulnerabilidades 
-        <em>«sin demora»</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo base supone un 
-        incumplimiento directo de las condiciones ya mencionadas.
+        Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>"sin vulnerabilidades aprovechables conocidas"</em>. 
+        Adicionalmente, el <strong>Anexo I, Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto, así como a abordar y subsanar 
+        dichas vulnerabilidades <em>"sin demora"</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo 
+        base supone un incumplimiento directo de las condiciones ya mencionadas.
     </p>
 
     <div class="info-box" style="padding: 15px; border-left: 4px solid #f39c12; background-color: #fdfae6; font-family: sans-serif; font-size: 0.9em;">
@@ -247,7 +247,7 @@
         <p style="margin-bottom: 0;">
             Debido a cómo distribuciones como Ubuntu gestionan los parches de seguridad (<em>backporting</em>), es posible que la herramienta reporte Falsos 
             Positivos en paquetes críticos (ej. <code>openssl</code>). La herramienta filtra automáticamente la mayoría cruzando datos con la API OSV.dev, el SO local
-            y los Security Trackers de Ubuntu y Debian. Si detecta anomalías persistentes, verifique la versión e incluya el CVE descartado en la whitelist de la 
+            y los Security Trackers de Ubuntu y Debian. Si se detectan anomalías persistentes, verifique la versión e incluya el CVE descartado en la whitelist de la 
             herramienta dentro del archivo controls.yaml (<code>vulnerabilities/ignorar</code>).
         </p>
     </div>
