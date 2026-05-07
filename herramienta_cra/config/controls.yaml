@@ -1,13 +1,10 @@
 # config/controls.yaml
-# Configuración de Auditoría CRA - Perfil Servidor Linux General
+# Configuración de Sealguard
 
 
-project:
-  nombre: "CRA Ubuntu Auditor"
-  storage_path: "output"
-
-
-#
+############################################################################################
+############ Integridad sistema ############################################################
+############################################################################################
 network:
   white_list:
     - "ssh"
@@ -29,43 +26,50 @@ network:
     "bindshell": "Shell remota."
     "echo": "A menudo usado por Netcat."
 
-# (Anexo I.1.2 - Gestión de vulnerabilidades)
+
+
+
+############################################################################################
+############ Vulnerabilidades del sistema ##################################################
+############################################################################################
 vulnerabilities: 
-  min_cvss_score: 7.0 # Reportar vulns de riesgo alto
-  comp_kernel: true
+  min_cvss_score: 9.0 # CVSS mínimo para que se muestren las vulnerabilidades
   ignorar: # Paquetes de riesgo asumido o que se ha comprobado que no son vulnerables
     - "DEBIAN-CVE-2026-31789"
     - "CVE-2026-31789"
     - "DEBIAN-CVE-2024-58250"
     - "CVE-2024-58250" 
-  timeout: 30 
 
 
-#(Anexo I.1.2 - Gestión de identidades)
-system: 
-  
-  updates:
-    check_unattended_upgrades: true 
-    check_days_since_last_update: 7
 
 
-# (Anexo I.1.3 - Integridad de datos y sistema)
+############################################################################################
+############ Integridad sistema ############################################################
+############################################################################################
+
 integrity: 
-  monitored_binaries:
     - "/bin/ls"
     - "/bin/ps"
     - "/bin/netstat"
     - "/bin/login"
     - "/usr/bin/sudo"
     - "/usr/sbin/sshd"
-
-  monitored_configs:
     - "/etc/hosts"
     - "/etc/resolv.conf"
     - "/etc/fstab"
+    - "/etc/shadow"
+    - "/etc/passwd"
+    - "/etc/ssh/sshd_config"
+    - "/etc/crontab"
+    - "/etc/sudoers"
+    - "/etc/pam.d/common-auth"
 
 
 
+
+############################################################################################
+############ Hardening del sistema #########################################################
+############################################################################################
 hardening: 
   critical_files:
     - path: "/etc/shadow"
@@ -106,11 +110,6 @@ hardening:
     - "iptables.service"
     - "nftables.service"
 
-  system_checks:
-    check_suid_sgid: true
-    check_aslr: true
-    check_mac: true # AppArmor / SELinux
-
   certificados:
     dias_aviso_caducidad: 30
     min_rsa_key_size: 2048
@@ -121,7 +120,7 @@ hardening:
       - "ecdsa-with-SHA256"
       - "ecdsa-with-SHA384"
     rutas_criticas:
-    # Estas rutas son de ejemplo, generamos un certificado válido y otro peligrosos (para usar la herramienta sustituyalo con la estructura indicada)
+# Estas rutas son de ejemplo, generamos un certificado válido y otro peligrosos (para usar la herramienta sustituyalo con la estructura indicada)
 #     - path: "/tmp/cert_malo.pem"
 #       tipo: "publico"
 #       max_permissions: "644"
@@ -135,14 +134,17 @@ hardening:
     algoritmo: "sha256"
     critical_mounts: ["/", "/home", "/var"]
 
-
+############################################################################################
+############ Disponibilidad ################################################################
+############################################################################################
 disponibilidad: ["backup", "rsync", "aws s3", "rclone"]
 
 
+
+############################################################################################
+############ Usuarios ######################################################################
+############################################################################################
 users:
-  check_root_locked: false # En Ubuntu cloud a veces root está bloqueado (passwd -l)
-  disallow_empty_passwords: true
-  max_password_days: 90
   critical_groups: ["root", "sudo", "adm"]
   politics: ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
   mfa:
@@ -161,10 +163,15 @@ users:
       ".google_authenticator": "pam_google_authenticator.so"
       ".yubico": "pam_yubico.so"
 
+
+
+############################################################################################
+############ Arranque del sistema ##########################################################
+############################################################################################
 boot:
   param_kernel:
     white_list:
-      - ["apparmor=1", "selinux=1", "enforcing=1"]  # Fuerza control de acceso obligatorio
+      - ["apparmor=1", "selinux=1", "enforcing=1"]  # Fuerza el uso de MAC
       - "audit=1"
       - "slab_nomerage=1"
       - "page_poison=1"
@@ -202,6 +209,3 @@ boot:
       - ["E", 8192, "Módulo no firmado cargado"]
       - ["L", 16384, "Ocurrió un soft lockup"]
       - ["J", 524288, "Operación de depuración mutante usada por usuario"]
-    
-
-

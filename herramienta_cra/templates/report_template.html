@@ -60,9 +60,11 @@
     <h1 id="resumen" class="section-title">Resumen Ejecutivo de Cumplimiento</h1>
     <p class="cra-context-text">
         Este informe técnico mapea la configuración actual del sistema contra los <strong>Requisitos Esenciales de Ciberseguridad
-         estipulados en el Anexo I</strong> de la propuesta de la CRA de la Unión Europea. El objetivo de esta auditoría automatizada
-         es certificar que el producto con elementos digitales cumple con los principios de <em>Secure by Default</em> (en el resto del documento lod describiremos como Seguro por Defecto) y 
-         <em>Secure by Design</em> (en el resto del documento lod describiremos como Seguro por Diseño) exigidos para su comercialización.
+        estipulados en el Anexo I</strong> de la propuesta de la Ley de Ciberresiliencia (Cyber  Resilience Act en inglés, la cual 
+        nombraremos en el resto del documento como CRA) de la Unión Europea. El objetivo de esta auditoría automatizada es certificar 
+        que el producto con elementos digitales cumple con los principios de "<em>Secure by Default</em>" (en el resto del documento 
+        nombraremos como "<em>Seguro por Defecto</em>") y <em>"Secure by Design"</em> (en el resto del documento nombraremos como 
+        "<em>Seguro por Diseño</em>") exigidos para su comercialización.
     </p>
 
 <table class="layout-table">
@@ -109,11 +111,12 @@
 
 <h2 class="subsection-title mt-sm">Impacto Legal y Normativo</h2>
     <p class="cra-context-text">
-        La siguiente tabla traduce el estado técnico de los controles evaluados en su impacto frente a la normativa CRA. Cabe destacar que 
-        la rigidez de estos requisitos y el proceso de certificación (autoevaluación vs. auditoría de terceros) son adaptables al nivel 
-        de riesgo del producto. Según la CRA, los productos se clasifican en: Categoría por Defecto, Clase I (Críticos) y Clase II (Altamente Críticos)
-        . Un hallazgo en estado de "Peligro" podrá presentar consecuencias en forma de sanciones o de bloqueo de mercado mucho más severas dependiendo de dicha clasificación.
-        Por favor tenga en cuenta que queda fuera de la herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado. Lea el manual de uso de la 
+        La siguiente tabla traduce el estado técnico de los controles evaluados en su impacto frente a la normativa <strong>CRA</strong>. Cabe destacar que 
+        la rigidez de estos requisitos y el proceso de certificación (<em>autoevaluación</em> vs. <em>auditoría de terceros</em>) son adaptables al nivel 
+        de riesgo del producto. Según la <strong>CRA</strong>, los productos se clasifican en: "<em>Categoría por Defecto</em>", "<em>Clase I (Críticos)</em>" 
+        y "<em>Clase II (Altamente Críticos)</em>". Un hallazgo en estado de "Peligro" podrá presentar consecuencias en forma de sanciones o de bloqueo de 
+        mercado mucho más severas dependiendo de dicha clasificación.
+        Por favor tenga en cuenta que queda fuera del alcance de la herramienta discernir a que categoría de las ya mencionadas pertenece el sistema auditado. Lea el manual de uso de la 
         herramienta para más información.
     </p>
     <table class="data-table mt-0">
@@ -130,11 +133,11 @@
             </tr>
             <tr>
                 <td><span class="dot bg-warning table-dot"></span> <strong>Advertencia</strong></td>
-                <td>Práctica de seguridad mejorable. Aunque actualmente no es un bloqueante legal, podría derivar en un incumplimiento ante nuevas regulaciones o vectores de ataque.</td>
+                <td>Práctica de seguridad mejorable. Aunque actualmente no es un bloquo legal, podría derivar en un incumplimiento ante nuevas regulaciones o vectores de ataque.</td>
             </tr>
             <tr>
                 <td><span class="dot bg-danger table-dot"></span> <strong>Peligro (Crítico)</strong></td>
-                <td><strong>No conformidad severa.</strong> Existe una violación directa del principio de "Seguridad por Defecto" que expone el sistema. Representa un bloqueo crítico para la certificación del producto.</td>
+                <td>Existe una violación directa del principio de "<em>Seguro por Defecto</em>" que expone el sistema. Representa un bloqueo crítico para la certificación del producto.</td>
             </tr>
         </tbody>
     </table>
@@ -179,7 +182,8 @@
     <!-- Explicación normativa -->
         <p class="cra-context-text">
             El <strong>Anexo I, Parte I, Requisitos 2(b) y 2(j) de la CRA</strong> exige que los productos con elementos digitales se comercialicen con una
-            "configuración segura por defecto" y estén diseñados para "limitar las superficies de ataque, incluidas las interfaces externas". 
+            "<em>configuración segura por defecto, a menos que el fabricante y el usuario profesional acuerden otra cosa</em>" y estén diseñados para "<em>limitar 
+            las superficies de ataque, incluidas las interfaces externas</em>". 
             Esto obliga a que cualquier puerto o servicio de red que no sea estrictamente necesario para el funcionamiento esencial del dispositivo deba 
             estar deshabilitado. La presencia de servicios expuestos no autorizados (marcados como PROHIBIDO) representa una violación directa de este 
             principio.        
@@ -202,8 +206,8 @@
         {# Comprobamos si esta interfaz solo tiene el puerto "falso" de relleno #}
         {% if grupo.list[0].puerto == '-' %}
             <tr>
-                <td colspan="5" style="text-align: center; padding: 15px; color: #155724;">
-                    <strong>Red Segura:</strong> No se detectaron puertos abiertos ni servicios expuestos no autorizados en esta interfaz.
+                <td colspan="5" style="text-align: center; padding: 15px; color: #555;">
+                    No se detectaron puertos abiertos ni servicios expuestos no autorizados en esta interfaz.
                 </td>
             </tr>
         {% else %}
@@ -238,15 +242,16 @@
     <p class="cra-context-text">
         Según el <strong>Anexo I, Parte I, Requisito 2(a) de la CRA</strong>, los productos con elementos digitales deben comercializarse <em>"sin vulnerabilidades aprovechables conocidas"</em>. 
         Adicionalmente, el <strong>Anexo I, Parte II, Requisitos 1 y 2</strong> obliga a los fabricantes a identificar los componentes presentes en el producto, así como a abordar y subsanar 
-        dichas vulnerabilidades <em>"sin demora"</em>, proporcionando las correspondientes actualizaciones de seguridad. La detección de debilidades (CVEs) sin parchear en el sistema operativo 
+        sus vulnerabilidades "<em>sin demora</em>", proporcionando las correspondientes actualizaciones de seguridad. La detección de vulnerabilidades (CVEs) sin parchear en el sistema operativo 
         base supone un incumplimiento directo de las condiciones ya mencionadas.
     </p>
 
     <div class="info-box" style="padding: 15px; border-left: 4px solid #f39c12; background-color: #fdfae6; font-family: sans-serif; font-size: 0.9em;">
         <h4 style="margin-top: 0; color: #d68910;">Nota sobre Falsos Positivos</h4>
         <p style="margin-bottom: 0;">
-            Debido a cómo distribuciones como Ubuntu gestionan los parches de seguridad (<em>backporting</em>), es posible que la herramienta reporte Falsos 
-            Positivos en paquetes críticos (ej. <code>openssl</code>). La herramienta filtra automáticamente la mayoría cruzando datos con la API OSV.dev, el SO local
+            Debido a cómo distribuciones como Ubuntu gestionan los parches de seguridad (<em>backporting</em>), es posible que la herramienta reporte 
+            <strong>falsos positivos </strong>
+            en paquetes. La herramienta filtra automáticamente la mayoría cruzando datos con la API OSV.dev, el SO local
             y los Security Trackers de Ubuntu y Debian. Si se detectan anomalías persistentes, verifique la versión e incluya el CVE descartado en la whitelist de la 
             herramienta dentro del archivo controls.yaml (<code>vulnerabilities/ignorar</code>).
         </p>
@@ -328,7 +333,7 @@
         accesos no autorizados mediante mecanismos de control de identidad adecuados. En el nivel del sistema operativo base, esto 
         exige la configuración estricta de las políticas de contraseñas (como su caducidad <code>login.defs</code>) 
         y la correcta gestión del ciclo de vida de los usuarios. Una configuración laxa en estos parámetros contraviene el principio 
-        de seguridad por defecto de la normativa, facilitando ataques de fuerza bruta o escalada de privilegios.
+        de "<en>Seguro por Defecto</en>" de la normativa, facilitando ataques de fuerza bruta, robo de credenciales o escalada de privilegios.
     </p>
     
     <table class="data-table">
@@ -386,8 +391,6 @@
     </table>
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Políticas individuales</h3>
-    <p class="text-xs" style="margin-bottom: 10px;">Valores extraídos del archivo <code>/etc/shadow</code> para los usuarios listados anteriormente.</p>
-
     <table class="data-table text-xs">
         <thead>
             <tr>
@@ -417,10 +420,10 @@
     <h2 class="subsection-title">5. Autenticación Multifactor</h2>
     <!-- Contexto normativo -->
     <p class="cra-context-text">
-        En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA (Requisito 2.d)</strong>, 
+        En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA Anexo I, Parte I, Requisito 2(d)</strong>, 
         la implementación de Autenticación Multifactor (MFA) constituye un control técnico fundamental. Su ausencia en vías de acceso
          críticas, como la administración remota, representa un riesgo severo de suplantación de identidad que comprometería la 
-         validación del sistema como "seguro por defecto" exigido por la normativa.
+         validación del sistema como "<en>Seguro por Defecto</en>" exigido por la normativa.
     </p>
 
     {% if datos['2FA'].mfa_global %}
@@ -503,7 +506,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="3" class="text-center">No se han encontrado tokens 2FA en los directorios personales.</td>
+                <td colspan="3" class="text-center">No se han encontrado tokens MFA en los directorios personales.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -534,16 +537,19 @@
     <h1 id="anexo-3" class="section-title">Sección III: Hardening del Sistema</h1>
     
     <p class="cra-context-text">
-        La <strong>Ley de Ciberresiliencia (CRA)</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos 
-        se comercializarán con una «configuración segura por defecto». El proceso de bastionado (hardening) evaluado en esta sección es el 
+        Tal y como hemos comentado anteriormente, la <strong>CRA</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos 
+        se comercializarán con una "<en>configuración segura por defecto</en>". El proceso de bastionado (hardening) evaluado en esta sección es el 
         mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la 
-        obligación de salvaguardar la integridad de los programas frente a manipulaciones <strong>(Requisito 2.f)</strong> y aplicar 
-        mecanismos para mitigar el aprovechamiento de vulnerabilidades <strong>(Requisito 2.k)</strong>.
+        obligación de salvaguardar la integridad de los programas frente a manipulaciones (<strong>Aenxo I, Parte I, Requisito 2(f)</strong>) y aplicar 
+        mecanismos para mitigar el aprovechamiento de vulnerabilidades (<strong>Aenxo I, Parte I, Requisito 2(k)</strong>).
     </p>
     
     <h2 class="subsection-title">6. Control de Acceso y Memoria</h2>
     <p class="cra-context-text">
-        La implementación de sistemas de Control de Acceso Obligatorio (MAC) y la randomización de memoria (ASLR) permiten al producto cumplir con el <strong>Requisito 2(k) de la CRA</strong>, el cual exige diseñar los sistemas provistos de «mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades», limitando el impacto de un posible incidente.
+        La implementación de sistemas de Control de Acceso Obligatorio (MAC) y la randomización de memoria (ASLR) permiten al 
+        producto cumplir con el <strong>Aenxo I, Parte I, Requisito 2(k) de la CRA</strong>, el cual exige diseñar los sistemas 
+        provistos de "<en>mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades</en>", 
+        limitando el impacto de un posible incidente.
     </p>
     <table class="data-table text-xs table-fixed">
         <thead>

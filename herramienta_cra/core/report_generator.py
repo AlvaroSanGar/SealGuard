@@ -98,7 +98,7 @@ def calcular_resumen_dinamico(datos):
     res_boot = analizar_modulo_complejo("6. Arranque Seguro", datos.get("boot", datos.get("booting", {})))
     
     # Resiliencia
-    res_disp = analizar_modulo_complejo("7. Resiliencia (Disponibilidad)", datos.get("disponibilidad", {}))
+    res_disp = analizar_modulo_complejo("7. Disponibilidad", datos.get("disponibilidad", {}))
 
     # Volcamos los resultados y sumamos las métricas
     for res in [res_identidad, res_hardening, res_boot, res_disp]:
@@ -165,7 +165,7 @@ def generar_informe(fecha, datos):
             # Cambiamos el dueño (uid) y el grupo (gid) del archivo PDF recién creado
             os.chown(ruta_pdf, user_info.pw_uid, user_info.pw_gid)
 
-        print_c(f"[Ok] Reporte generado en: {ruta_pdf}\n")
-
+        print_c("[Ok] Reporte generado en: "+str(ruta_pdf)+"\n")
+        os._exit(0)
     except Exception as e:
-        print_c(f"[ERROR] Fallo crítico al generar el informe: {e}")
+        print_c("[ERROR] Fallo crítico al generar el informe: "+str(e))
