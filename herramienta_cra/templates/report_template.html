@@ -257,20 +257,18 @@
         </p>
     </div>
     
-    <div class="info-box">Total de paquetes escaneados: {{ datos.paquetes.apt + datos.paquetes.pip }} (APT y PIP).</div>
+    <div class="info-box">Total de paquetes escaneados: {{ datos.paquetes.apt}} (APT).</div>
     
     <table class="data-table">
         <tr>
-            <th class="col-w-20">Paquete Afectado</th>
-            <th class="col-w-15">Versión</th>
-            <th class="col-w-15">Entorno</th>
+            <th class="col-w-25">Paquete Afectado</th>
+            <th class="col-w-25">Versión</th>
             <th class="col-w-50">Vulnerabilidades (CVE y Score CVSS)</th>
         </tr>
         {% for vuln in datos.vulns %}
         <tr>
             <td><strong>{{ vuln.paquete }}</strong></td>
             <td>{{ vuln.version }}</td>
-            <td>{{ vuln.tipo }}</td>
             <td>
                 <span class="badge bg-danger mb-sm">{{ vuln.cantidad }} CVEs Detectados</span><br>
                 
@@ -1154,8 +1152,8 @@
     
     <p class="cra-context-text">
         El <strong>Anexo I, Parte I, Requisito 2(h) de la CRA</strong> exige explícitamente que los productos con elementos digitales 
-        protejan «la disponibilidad de funciones esenciales y básicas, también tras un incidente, también mediante medidas de 
-        resiliencia frente a ataques de denegación de servicio y paliativas de sus efectos». La configuración de límites estrictos 
+        protejan "<em>la disponibilidad de funciones esenciales y básicas, también tras un incidente, también mediante medidas de 
+        resiliencia frente a ataques de denegación de servicio y paliativas de sus efectos</em>". La configuración de límites estrictos 
         de asignación de recursos del sistema (previniendo el agotamiento por procesos descontrolados) y el bastionado de la pila de 
         red en el kernel (como la activación de SYN Cookies) son controles obligatorios para acreditar la capacidad del producto para 
         resistir intentos de saturación intencionados.

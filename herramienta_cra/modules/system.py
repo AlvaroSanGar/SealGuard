@@ -89,17 +89,6 @@ def paquetes_instalados():
         p['type'] = 'System (APT)'
     return resultado
 
-# Paquetes de Python con pip
-def paquetes_python():
-    query = "SELECT name, version FROM python_packages;"
-    resultado = ejecutar_consulta(query)        
-    # Igual que antes
-    for p in resultado:
-        p['ecosystem'] = 'PyPI'
-        p['type'] = 'Python (PIP)'
-    return resultado
-
-
 
 
 

@@ -180,8 +180,6 @@ boot:
       - "nokaslr"
       - ["mitigations=off", "nopti"]
 
-  contra_fisica: false
-
   integridad_kernel:
     white_list:
       - ["P", 1, "Módulo propietario cargado"]

@@ -344,13 +344,6 @@ def auditar_seguridad_grub(verbose, datos_grub):
         "pass_msg": ""
     }
     
-      # Cargamos los datos del .yaml
-    try:
-        contra = config["boot"]["contra_fisica"]
-    
-    except KeyError:
-        contra = False
-    
     # Comprobamos si datos_grub_hardening existe y tiene datos significativos (es decir, que se ha analizado correctamente)
     if not datos_grub or datos_grub.get("estado") == "NO ENCONTRADO":
         alerta = "El archivo de configuración de GRUB no fue encontrado por el módulo de hardening"
@@ -433,12 +426,8 @@ def auditar_seguridad_grub(verbose, datos_grub):
 
 
     ######### Catalogamos el resultado final #####################################################
-    # Caso de que todo esté correcto
-    if resultados["protegido"] and resultados["permisos_ok"]:
-        resultados["estado"] = "SEGURO"
-    
-    # Caso de que algo falle   
-    elif resultados["permisos_ok"] and not contra:
+    # Caso de que los permisos sean correctos (la contra no es obligatoria)  
+    elif resultados["permisos_ok"]:
         resultados["estado"] = "SEGURO"
     
     else:
