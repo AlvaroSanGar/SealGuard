@@ -53,18 +53,6 @@ FAMILIAS_DEBIAN = {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 ############ Detección de distro #####################################################################################################################################
 def detectar_info_distro():
     info = {
@@ -126,23 +114,6 @@ def detectar_info_distro():
 
 
 ECOSISTEMAS_SO, TIPO_TRACKER, CODENAME_TRACKER, DISTRO_ID = detectar_info_distro()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ####################################################################################################################################################################
@@ -213,27 +184,6 @@ def cve_parcheado_ubuntu(cve_id, nombre_paquete, version_instalada):
     return resultado
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ####################################################################################################################################################################
 ########### Security tracker Debian ################################################################################################################################
 ####################################################################################################################################################################
@@ -273,16 +223,6 @@ def cargar_debian_tracker():
         except Exception as e:
             print_c("   [!] No se pudo cargar el Debian Security Tracker: "+str(e))
             return False
-
-
-
-
-
-
-
-
-
-
 
 
 def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
@@ -333,21 +273,6 @@ def cve_parcheado_debian(cve_id, nombre_paquete, version_instalada):
     return None
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ##################################################################################################################################################################
 ################### Dispatcher ###################################################################################################################################
 ##################################################################################################################################################################
@@ -359,24 +284,6 @@ def cve_parcheado(cve_id, nombre_paquete, version_instalada):
     if TIPO_TRACKER == "debian":
         return cve_parcheado_debian(cve_id, nombre_paquete, version_instalada)
     return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ####################################################################################################################################################################
@@ -398,16 +305,6 @@ def comparar_versiones_nativa(v_instalada, v_fixed):
             stderr=subprocess.DEVNULL
         )
         return res.returncode == 0
-
-
-
-
-
-
-
-
-
-
 
 
 def parse_vector(data):
@@ -450,24 +347,6 @@ def parse_vector(data):
     return None
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def obtener_score_con_cache(vid, v_data, sesion):
     # Tratamos de obtener el resultado en la caché de CVEs para no realizar una petición a OSV.dev (esto nos permite optimizar enormemente el proceso en tiempo)
     with _cache_lock: # Bloqueamos pq accedemos a la caché temporal
@@ -496,15 +375,6 @@ def obtener_score_con_cache(vid, v_data, sesion):
         cache_detalles_osv[vid] = resultado
 
     return resultado
-
-
-
-
-
-
-
-
-
 
 
 def normalizar(valor):
@@ -541,17 +411,6 @@ def obtener_cves_reales(v):
     return list(cves)
 
 
-
-
-
-
-
-
-
-
-
-
-
 def es_falso_positivo_so(version_instalada, vuln_data):
     # El JSON que recibimos de OSV contiene el parámetro affected, el cual indica los entornos en los que afecta la vuln así como el paquete([{bash, Debian},{bash, Kali}]) con
     # una lista de diccionarios (realmente una profundidad de 2 diccionarios pero no importa para la explicación)
@@ -571,12 +430,6 @@ def es_falso_positivo_so(version_instalada, vuln_data):
                     if comparar_versiones_nativa(version_instalada, event["fixed"]):
                         return True
     return False
-
-
-
-
-
-
 
 
 ##################################################################################################################################################################
@@ -601,20 +454,12 @@ def post_con_reintentos(sesion, url, payload):
             
         # Si la petición falla, aborta y vuelve a mandar el paquete
         except requests.exceptions.RequestException as e:
-            print_c("  [!] Intento "+str(int(intento + 1))+"/"+MAX_REINTENTOS+" fallido: "+str(e))
+            print_c("  [!] Intento "+str(intento + 1)+"/"+str(MAX_REINTENTOS)+" fallido: "+str(e))
         
         # Si hay un fallo del servidor el hilo espera antes de volver a mandar un apetición para no sobresaturar el servidor (el tiempo de espera es exponencial)
         time.sleep(2 ** intento)
     print_c("   [ERROR] Lote descartado tras agotar reintentos")
     return None
-
-
-
-
-
-
-
-
 
 
 def construir_consultas_apt(paquetes_apt):
@@ -633,15 +478,6 @@ def construir_consultas_apt(paquetes_apt):
             # Por limitaciones de la API, no nos devuelve la respuesta indicando el paquete de envío, por lo que clonamos el diccionario para saber a que petición pertenece que respuesta
             meta.append({**p, "ecosystem": ecosistema})
     return consultas, meta
-
-
-
-
-
-
-
-
-
 
 
 ##################################################################################################################################################################
@@ -668,7 +504,9 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
             continue
 
         pkg = paquetes_meta[index]
-        clave = pkg["name"]
+
+        # Usamos nombre + tipo como clave para evitar colisiones entre paquetes APT y PIP con el mismo nombre (ej: cloud-init, ufw...)
+        clave = pkg["name"] + "::" + pkg["type"]
 
         if clave not in acumulador:
             acumulador[clave] = {
@@ -733,16 +571,6 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
     return hallazgos
 
 
-
-
-
-
-
-
-
-
-
-
 def trabajador_lote(lote_info):
     consultas_lote, meta_lote, cfg_vulns = lote_info
     sesion = requests.Session()
@@ -752,27 +580,22 @@ def trabajador_lote(lote_info):
     return procesar_resultados_batch(data.get("results", []), meta_lote, cfg_vulns, sesion)
 
 
-
-
-
-
-
-
-
-
-
 def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
     cfg_vulns = config.get("vulnerabilities", {})
 
     consultas_apt, meta_apt = construir_consultas_apt(paquetes_apt)
 
-    consultas_pip = [
-        {"package": {"name": p["name"], "ecosystem": "PyPI"}, "version": p["version"]}
-        for p in paquetes_pip
-    ]
+    consultas_pip = []
+    meta_pip = []
+    for p in paquetes_pip:
+        consultas_pip.append({
+            "package": {"name": p["name"], "ecosystem": "PyPI"},
+            "version": p["version"]
+        })
+        meta_pip.append({**p, "ecosystem": "PyPI"})
 
     todas_consultas = consultas_apt + consultas_pip
-    todo_meta       = meta_apt + paquetes_pip
+    todo_meta       = meta_apt + meta_pip
 
     lotes = []
     for i in range(0, len(todas_consultas), TAM_LOTE):
@@ -790,7 +613,8 @@ def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
     # Deduplicación final entre lotes
     vistos = {}
     for h in hallazgos:
-        clave = h["paquete"]
+        # Usamos nombre + tipo como clave para evitar colisiones entre paquetes APT y PIP con el mismo nombre
+        clave = h["paquete"] + "::" + h["tipo"]
         if clave not in vistos:
             vistos[clave] = h
         else:
@@ -801,18 +625,6 @@ def escanear_vulnerabilidades(paquetes_apt, paquetes_pip):
                     vistos[clave]["cantidad"] += 1
 
     return list(vistos.values())
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ##################################################################################################################################################################

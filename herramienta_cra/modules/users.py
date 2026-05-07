@@ -10,7 +10,12 @@ def info_usuarios_base(verbose, uid_min):
     print_c("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
-    critical_groups = config["users"]["critical_groups"]
+    try:
+        critical_groups = config["users"]["critical_groups"]
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han cargado los grupos por defecto")
+        critical_groups = ["root", "sudo", "adm"]
+
     if verbose:
         print_c("     [i] Grupos marcados como críticos: "+str(critical_groups))
     
@@ -137,7 +142,12 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 def politicas_passwords(verbose):
     print("")
     print_c("[+] Auditando políticas de contraseñas generales")
-    politicas = config["users"]["politics"]
+    try:
+        politicas = config["users"]["politics"]
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido los atributos defecto")
+        politicas = ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
+
     politica_general = {}
     try:
         with open("/etc/login.defs", "r") as f:
@@ -179,10 +189,22 @@ def politicas_passwords(verbose):
 def comp_2FA(verbose, usuarios):
     print("")
     print_c("[+] Buscando métodos de doble factor de autentificación")
-    modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
-    servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
+    try:
+        modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
+        servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
+        mapa_tokens = config["users"]["mfa"]["tokens_requeridos"]
+
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido la configuración por defecto")
+        modulos_2fa = ["pam_google_authenticator.so", "pam_duo.so", "pam_yubico.so", "pam_u2f.so"]
+        servicios_pam = ["sshd", "sudo", "login"]
+        mapa_tokens = {
+            ".google_authenticator": "pam_google_authenticator.so",
+            ".yubico": "pam_yubico.so"
+        }
+
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']
-    mapa_tokens = config["users"]["mfa"]["tokens_requeridos"]
+    
     
     reporte_2fa = {
         'mfa_global': False,

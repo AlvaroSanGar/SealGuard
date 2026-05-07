@@ -511,3 +511,9 @@ ul { margin-top: 5px; padding-left: 20px; }
     line-height: 1.6;
 }
 
+
+/* Evitamos que se parta una fila al cambiar de página */
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}

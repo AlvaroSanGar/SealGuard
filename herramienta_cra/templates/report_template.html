@@ -333,7 +333,7 @@
         accesos no autorizados mediante mecanismos de control de identidad adecuados. En el nivel del sistema operativo base, esto 
         exige la configuración estricta de las políticas de contraseñas (como su caducidad <code>login.defs</code>) 
         y la correcta gestión del ciclo de vida de los usuarios. Una configuración laxa en estos parámetros contraviene el principio 
-        de "<en>Seguro por Defecto</en>" de la normativa, facilitando ataques de fuerza bruta, robo de credenciales o escalada de privilegios.
+        de "<em>Seguro por Defecto</em>" de la normativa, facilitando ataques de fuerza bruta, robo de credenciales o escalada de privilegios.
     </p>
     
     <table class="data-table">
@@ -423,7 +423,7 @@
         En consonancia con el requisito de gestión de la identidad y control de acceso de la <strong>CRA Anexo I, Parte I, Requisito 2(d)</strong>, 
         la implementación de Autenticación Multifactor (MFA) constituye un control técnico fundamental. Su ausencia en vías de acceso
          críticas, como la administración remota, representa un riesgo severo de suplantación de identidad que comprometería la 
-         validación del sistema como "<en>Seguro por Defecto</en>" exigido por la normativa.
+         validación del sistema como "<em>Seguro por Defecto</em>" exigido por la normativa.
     </p>
 
     {% if datos['2FA'].mfa_global %}
@@ -538,7 +538,7 @@
     
     <p class="cra-context-text">
         Tal y como hemos comentado anteriormente, la <strong>CRA</strong> establece en su <strong>Anexo I, Parte I, Requisito 2(b)</strong> que los productos 
-        se comercializarán con una "<en>configuración segura por defecto</en>". El proceso de bastionado (hardening) evaluado en esta sección es el 
+        se comercializarán con una "<em>configuración segura por defecto</em>". El proceso de bastionado (hardening) evaluado en esta sección es el 
         mecanismo técnico principal para auditar dicho estado. Asimismo, los controles detallados a continuación responden directamente a la 
         obligación de salvaguardar la integridad de los programas frente a manipulaciones (<strong>Aenxo I, Parte I, Requisito 2(f)</strong>) y aplicar 
         mecanismos para mitigar el aprovechamiento de vulnerabilidades (<strong>Aenxo I, Parte I, Requisito 2(k)</strong>).
@@ -548,7 +548,7 @@
     <p class="cra-context-text">
         La implementación de sistemas de Control de Acceso Obligatorio (MAC) y la randomización de memoria (ASLR) permiten al 
         producto cumplir con el <strong>Aenxo I, Parte I, Requisito 2(k) de la CRA</strong>, el cual exige diseñar los sistemas 
-        provistos de "<en>mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades</en>", 
+        provistos de "<em>mecanismos y técnicas adecuados para paliar el aprovechamiento de las vulnerabilidades</em>", 
         limitando el impacto de un posible incidente.
     </p>
     <table class="data-table text-xs table-fixed">
@@ -720,8 +720,9 @@
     <h2 class="subsection-title">9. Firewall</h2>
     
     <p class="cra-context-text">
-        El <strong>Requisito 2(j) de la CRA</strong> obliga de manera explícita a que los productos estén diseñados para «limitar las 
-        superficies de ataque, incluidas las interfaces externas». La presencia y correcta configuración de un cortafuegos (Firewall) a 
+        Tal y como hemos comentado anteriormente, el <strong>Anexo i, Parte I, Requisito 2(j) de la CRA</strong> obliga de manera 
+        explícita a que los productos estén diseñados para "<em>limitar las superficies de ataque, incluidas las interfaces externas </em>". La presencia y 
+        correcta configuración de un cortafuegos (Firewall) a 
         nivel de kernel es el control técnico idóneo para validar este requerimiento, asegurando que el equipo aplique políticas restrictivas 
         frente a conexiones no autorizadas.
     </p>
@@ -820,7 +821,10 @@
 
 <h2 class="subsection-title">10. Cifrado de Almacenamiento</h2>
     <p class="cra-context-text">
-        El <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong> es concluyente al requerir que los productos «protegerán la confidencialidad de los datos [...] mediante, por ejemplo, el cifrado de los datos en reposo». La ausencia de cifrado (como LUKS en entornos Linux) en particiones que alberguen información sensible supone una vulneración directa de este mandato legal, exponiendo la configuración y la información ante el acceso físico directo o el robo del dispositivo.
+        El <strong>Anexo I, Parte I, Requisito 2(e) de la CRA</strong> es concluyente al requerir que los productos "<em>protegerán la confidencialidad de 
+        los datos [...] mediante, por ejemplo, el cifrado de los datos en reposo</em>". La ausencia de cifrado en particiones 
+        que alberguen información sensible supone una vulneración directa de este mandato legal, exponiendo la configuración y la información ante el 
+        acceso físico directo o el robo del dispositivo.
     </p>
 
     <h3 style="font-size: 11pt; color: var(--navy-blue); margin-bottom: 8px;">Análisis de Particiones Físicas</h3>
@@ -872,19 +876,22 @@
             {% else %}
                 <span class="text-danger-bold">No se detectó cifrado en ninguna partición crítica.</span>
             {% endif %}
-            <p style="margin-top: 8px; font-size: 9pt;">Se recomienda encarecidamente el uso de LUKS para proteger la confidencialidad de la información ante la pérdida o robo físico del equipo.</p>
+            <p style="margin-top: 8px; font-size: 9pt;">Se recomienda encarecidamente el uso de cifrado para proteger la confidencialidad de la información ante la pérdida o robo físico del equipo.</p>
         </div>
     {% endif %}
 
     <h2 class="subsection-title">11. Binarios con Permisos Peligrosos (SUID / SGID)</h2>
 
     <p class="cra-context-text">
-        En virtud del <strong>Requisito 2(f) de la CRA</strong>, los dispositivos deben proteger «los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada». Auditar los binarios con permisos elevados (SUID/SGID) y los privilegios asignados a los archivos de configuración core (como <code>/etc/shadow</code> o <code>/etc/sudoers</code>) es vital. Identificar y reportar permisos excesivos garantiza la verificación de la resistencia del sistema frente a técnicas locales de escalada de privilegios y persistencia.
+        En virtud del <strong>Anexo I, Parte I, Requisito 2(f) de la CRA</strong>, los dispositivos deben proteger "<em>los comandos, los programas y la configuración frente a toda manipulación o 
+        modificación no autorizada</em>". Auditar los binarios con permisos elevados (SUID/SGID) y los privilegios asignados a los archivos de configuración core (como 
+        <code>/etc/shadow</code> o <code>/etc/sudoers</code>) es vital. Identificar y reportar permisos excesivos garantiza la verificación de la resistencia del sistema 
+        frente a técnicas locales de escalada de privilegios y persistencia.
     </p>
 
     {% if datos.hardening.suid_sgid.peligrosos|length == 0 %}
         <div class="success-box">
-            <strong>Protección Activa:</strong> Se han auditado {{ datos.hardening.suid_sgid.seguros }} procesos con SUID/SGID activos. Ninguno de ellos se encuentra en directorios críticos ni posee permisos excesivos.
+            <strong>Protección Activa:</strong> Se han auditado {{ datos.hardening.suid_sgid.seguros }} archivos con SUID/SGID activos. Ninguno de ellos se encuentra en directorios críticos ni posee permisos excesivos.
         </div>
     {% else %}
         <div class="alert-box" style="margin-bottom: 10px;">
@@ -973,11 +980,11 @@
     <h2 class="subsection-title">13. Monitorización de Integridad</h2>
     
     <p class="cra-context-text">
-        El <strong>Anexo I, Parte I, Requisito 2(f) de la CRA</strong> exige que los productos protejan «la integridad de los datos 
+        El <strong>Anexo I, Parte I, Requisito 2(f) de la CRA</strong> exige que los productos protejan "<em>la integridad de los datos 
         [...], los comandos, los programas y la configuración frente a toda manipulación o modificación no autorizada [...] e 
-        informarán sobre los casos de corrupción de datos». La monitorización continua de archivos críticos base es el control 
-        técnico directo para satisfacer esta obligación, permitiendo detectar de forma temprana troyanizaciones, inyecciones de 
-        código o alteraciones indebidas en la configuración estructural del sistema.
+        informarán sobre los casos de corrupción de datos</em>". La monitorización continua de archivos críticos es el control 
+        técnico directo para satisfacer esta obligación, permitiendo detectar de forma temprana alteraciones indebidas 
+        en la configuración del sistema.
     </p>
     
     <table class="data-table text-xs table-fixed">

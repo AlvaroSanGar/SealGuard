@@ -4,6 +4,7 @@ import pwd
 import time
 import subprocess
 import re
+import grp
 from modules.system import ejecutar_consulta
 from config.settings import config
 from core.colores_terminal import print_c, mostrar_subtitulos
@@ -16,13 +17,45 @@ def auditar_suid_sgid(verbose):
         "seguros": 0,
         "peligrosos": []
     }
-    critical_dir = config["hardening"]["suid_sgid"]["critical_directories"]
-    critical_per = config["hardening"]["suid_sgid"]["forviden_permissions"]
-    
+    try:
+        critical_dir = config["hardening"]["suid_sgid"]["critical_directories"]
+        critical_per = config["hardening"]["suid_sgid"]["forviden_permissions"]
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se ha cargado la configuración por defecto")
+        critical_dir = ["/tmp/", "/home/", "/dev/shm/"]
+        critical_per = ["2", "3", "6", "7"]
+
     # Obtenemos todas las columnas suid_bin y la columna mode de file (indica los permisos)
     query = '''SELECT s.path, s.username, s.groupname, s.permissions, f.mode 
     FROM suid_bin AS s LEFT JOIN file AS f ON s.path = f.path;'''
     res_consulta = ejecutar_consulta(query)
+
+    # Obtenemos los archivos suid o gid de los dir de la config ya que OSQuery por defecto no los mira
+    rutas_extra = []
+    if critical_dir:
+        try:
+            cmd = ["find"] + critical_dir + ["-type", "f", "-perm", "/6000"]
+            # Ejecutamos el comando de arriba en terminal
+            res_find = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)            
+            
+            if res_find.returncode == 0 or res_find.returncode == 1: 
+                for ruta in res_find.stdout.splitlines():
+                    
+                    # Si el archivo no está en los que ha obtenido OSQuery obtenemos su info y lo metemos a la lista
+                    if not any(p.get("path") == ruta for p in res_consulta):
+                        try:
+                            stat_info = os.stat(ruta)
+                            rutas_extra.append({
+                                "path": ruta,
+                                "username": pwd.getpwuid(stat_info.st_uid).pw_name,
+                                "groupname": grp.getgrgid(stat_info.st_gid).gr_name,
+                                "mode": str(oct(stat_info.st_mode))[-4:]
+                            })
+                        except Exception:
+                            pass
+            res_consulta.extend(rutas_extra)
+        except Exception as e:
+            if verbose: print_c("     [!] Fallo al escanear directorios extra: " + str(e))
     
     # Clasificamos cada resultado de la consulta
     for proceso in res_consulta:
@@ -74,8 +107,28 @@ def auditar_archivos_criticos(verbose):
     try:
         archivos_yaml = config["hardening"]["critical_files"]
     except KeyError:
-        # Si borran la sección entera en el YAML, creamos una lista vacía
-        archivos_yaml = [] 
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido las rutas por defecto")
+        archivos_yaml = [{
+                "path": "/etc/shadow",
+                "max_permissions": "640", 
+                "owner": "root"
+            },{
+                "path": "/etc/passwd",
+                "max_permissions": "644",
+                "owner": "root"
+            },{
+                "path": "/etc/ssh/sshd_config",
+                "max_permissions": "600",
+                "owner": "root"
+            },{
+                "path": "/etc/crontab",
+                "max_permissions": "644",
+                "owner": "root"
+            },{
+                "path": "/etc/sudoers", 
+                "max_permissions": "440",
+                "owner": "root"
+            }] 
         
     resultados = []
 

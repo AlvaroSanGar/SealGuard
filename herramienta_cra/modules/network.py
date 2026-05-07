@@ -10,8 +10,24 @@ def escaneo_puertos(lista_ips, verbose):
         print_c("     [i] Interfaces a escanear: "+str(lista_ips)+"\n")
     
     nm = nmap.PortScanner()
-    white_list = config['network']['white_list']
-    black_list = config['network']['black_list']
+    try:
+        white_list = config['network']['white_list']
+        black_list = config['network']['black_list']
+    except KeyError as e:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido las listas por defecto")
+        white_list["ssh", "http", "https", "ipp", "postgresql", "mysql", "domain"]
+        black_list = {
+            "ftp": "Tráfico en texto plano. Usar SFTP.",
+            "telnet": "Acceso remoto inseguro. Usar SSH.",
+            "vnc": "Escritorio remoto no cifrado por defecto.",
+            "exec": "Comando remoto legacy.",
+            "login": "Login remoto legacy.",
+            "shell": "Shell remota legacy.",
+            "unknown": "Servicio desconocido o sospechoso (Posible Netcat/Listener crudo).",
+            "bindshell": "Shell remota.",
+            "echo": "A menudo usado por Netcat."
+        }
+        
     resultados = []
 
     # Bucle principal
