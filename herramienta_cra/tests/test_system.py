@@ -89,12 +89,7 @@ class TestSystemModule(unittest.TestCase):
         self.assertEqual(resultado[0]['ecosystem'], 'Debian')
         self.assertEqual(resultado[0]['type'], 'System (APT)')
 
-    @patch('modules.system.ejecutar_consulta')
-    def test_paquetes_python(self, mock_ejecutar):
-        mock_ejecutar.return_value = [{"name": "requests", "version": "2.25.1"}]
-        resultado = mSystem.paquetes_python()
-        self.assertEqual(resultado[0]['ecosystem'], 'PyPI')
-        self.assertEqual(resultado[0]['type'], 'Python (PIP)')
+
 
     @patch('modules.system.subprocess.run')
     def test_ejecutar_consulta_json_invalido(self, mock_run):

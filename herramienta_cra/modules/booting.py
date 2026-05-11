@@ -26,7 +26,8 @@ def auditar_integridad_firmware(verbose):
         black_list = config["boot"]["integridad_kernel"]["black_list"]
         
     except KeyError:
-        print_c("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
+        msg = "No se ha encontrado la configuración de parametros del kernel en config.yaml"
+        print_c("     [ERROR] "+str(msg))
         resultados["detalles"].append(msg)
         white_list = [["P", 1, "Módulo propietario"], ["O", 4096, "Módulo externo"]]
         warning_list = [["W", 512, "Warning"], ["C", 1024, "Staging"], ["K", 32768, "Live patched"]]
@@ -223,7 +224,7 @@ def auditar_parametros_kernel(verbose):
                     op = opcion
                     break
                     
-                if opcion in grub_def:
+                elif opcion in grub_def:
                     aparece_default = True
                     op = opcion
             
@@ -427,7 +428,7 @@ def auditar_seguridad_grub(verbose, datos_grub):
 
     ######### Catalogamos el resultado final #####################################################
     # Caso de que los permisos sean correctos (la contra no es obligatoria)  
-    elif resultados["permisos_ok"]:
+    if resultados["permisos_ok"]:
         resultados["estado"] = "SEGURO"
     
     else:

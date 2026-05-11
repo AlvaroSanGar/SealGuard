@@ -1,5 +1,5 @@
 import yaml
-import sys # de momento lo dejamos pero luego se puede comprobar si funciona exit() normal
+import sys 
 
 
 def loadYaml(path):

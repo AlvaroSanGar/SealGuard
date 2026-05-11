@@ -89,9 +89,16 @@ class TestHardeningCompleto(unittest.TestCase):
     @patch('modules.hardening.config', {"hardening": {}})
     @patch('modules.hardening.ejecutar_consulta')
     def test_archivos_criticos_yaml_vacio(self, mock_db):
+        # El mock devuelve datos para GRUB
         mock_db.return_value = [{"path": "/etc/default/grub", "mode": "0644", "username": "root"}]
         res = auditar_archivos_criticos(False)
-        self.assertEqual(res[0]["archivo"], "/etc/default/grub")
+        
+        # Buscamos GRUB en la lista de resultados generada por el fallback
+        resultado_grub = next((item for item in res if item["archivo"] == "/etc/default/grub"), None)
+        
+        # Verificamos que GRUB se ha auditado y que, con los datos del mock, es SEGURO
+        self.assertIsNotNone(resultado_grub)
+        self.assertEqual(resultado_grub["estado"], "SEGURO")
 
     @patch('modules.hardening.ejecutar_consulta')
     def test_archivos_criticos_permisos_restrictivos_ok(self, mock_db):
@@ -208,8 +215,8 @@ class TestHardeningCompleto(unittest.TestCase):
         res = auditar_mac(False)
         self.assertEqual(res["estado"], "PELIGROSO")
 
-# =====================================================================
-    # 7. CERTIFICADOS (TEST CORREGIDO + NUEVOS)
+    # =====================================================================
+    # 7. CERTIFICADOS
     # =====================================================================
     @patch('os.path.exists', return_value=True)
     @patch('os.stat')
@@ -217,11 +224,9 @@ class TestHardeningCompleto(unittest.TestCase):
     @patch('modules.hardening.ejecutar_consulta')
     @patch('time.time', return_value=1000000)
     def test_certificados_perfecto(self, mock_time, mock_db, mock_pwd, mock_stat, mock_exists):
-        """CORREGIDO: Diferencia permisos entre clave y certificado para evitar falso positivo"""
         def stat_side_effect(path):
             m = MagicMock()
             m.st_uid = 0
-            # Asignamos permisos correctos según el archivo: 600 para clave, 644 para cert
             m.st_mode = 0o100600 if "key.pem" in path else 0o100644
             return m
             
@@ -238,9 +243,7 @@ class TestHardeningCompleto(unittest.TestCase):
     @patch('os.stat')
     @patch('modules.hardening.ejecutar_consulta')
     def test_certificados_autofirmado(self, mock_db, mock_stat, mock_exists):
-        """Detecta si un certificado es autofirmado (issuer == subject)"""
         mock_stat.return_value.st_mode = 0o100644
-        # Simulamos que el emisor y el sujeto son la misma entidad[cite: 10]
         mock_db.return_value = [{
             "issuer": "Entidad_Prueba", "subject": "Entidad_Prueba",
             "not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"
@@ -252,11 +255,9 @@ class TestHardeningCompleto(unittest.TestCase):
     @patch('os.stat')
     @patch('modules.hardening.ejecutar_consulta')
     def test_certificados_rsa_debil(self, mock_db, mock_stat, mock_exists):
-        """Detecta claves RSA de tamaño inferior al mínimo configurado[cite: 10]"""
         mock_stat.return_value.st_mode = 0o100644
         mock_db.return_value = [{"not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"}]
         with patch('modules.hardening.subprocess.run') as mock_run:
-            # Simulamos una clave de 1024 bits (inferior a los 2048 requeridos)[cite: 10]
             mock_run.return_value = MagicMock(returncode=0, stdout="Public-Key: (1024 bit)\nTLS Web Server Authentication")
             res = auditar_certificados(False)
             self.assertTrue(any("clave insuficiente: 1024 bits" in a for a in res["alertas"]))
@@ -265,11 +266,9 @@ class TestHardeningCompleto(unittest.TestCase):
     @patch('os.stat')
     @patch('modules.hardening.ejecutar_consulta')
     def test_certificados_eku_incorrecto(self, mock_db, mock_stat, mock_exists):
-        """Detecta si falta el propósito 'Server Authentication' (EKU)[cite: 10]"""
         mock_stat.return_value.st_mode = 0o100644
         mock_db.return_value = [{"not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"}]
         with patch('modules.hardening.subprocess.run') as mock_run:
-            # Simulamos salida de openssl sin la cadena necesaria[cite: 10]
             mock_run.return_value = MagicMock(returncode=0, stdout="Public-Key: (2048 bit)\nPurpose: Email Protection")
             res = auditar_certificados(False)
             self.assertTrue(any("no tiene el permiso 'Server Authentication'" in a for a in res["alertas"]))

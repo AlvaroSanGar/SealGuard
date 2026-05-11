@@ -517,3 +517,15 @@ tr {
     page-break-inside: avoid;
     break-inside: avoid;
 }
+
+/* Clase para el pie de página al final del informe */
+.report-footer-final {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 8pt;
+    color: #7f8c8d;
+    padding-bottom: 20px;
+}

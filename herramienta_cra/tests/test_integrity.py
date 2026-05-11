@@ -3,15 +3,16 @@ from unittest.mock import patch, mock_open, MagicMock
 import json
 import modules.integrity as mIntegrity
 
-# Mockeamos el settings.yaml para no depender de archivos reales
+# Mockeamos el settings.yaml con la estructura REAL (lista plana)
 MOCK_CONFIG = {
     "hardening": {  
         "critical_files": [{"path": "/etc/shadow"}]
     },
-    "integrity": {
-        "monitored_binaries": ["/bin/ls"],
-        "monitored_configs": ["/etc/hosts"]
-    }
+    "integrity": [
+        "/etc/shadow",
+        "/bin/ls",
+        "/etc/hosts"
+    ]
 }
 
 @patch.dict('modules.integrity.config', MOCK_CONFIG, clear=True)
@@ -77,6 +78,7 @@ class TestIntegridadModulo(unittest.TestCase):
         
         self.assertTrue(mock_json_dump.called)
         datos_guardados = mock_json_dump.call_args[0][0]
+        # La lista tiene 3 rutas, por lo que debe haber 3 datos guardados
         self.assertEqual(len(datos_guardados), 3)
         self.assertIn("/etc/shadow", datos_guardados)
 
