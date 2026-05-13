@@ -24,5 +24,44 @@ if [ ! -d "venv" ]; then
     fi
 fi
 
+# Comprobamos Nmap
+if ! command -v nmap &> /dev/null; then
+    echo -e "\e[33m[!]\e[0m 'nmap' no detectado. Procediendo a su instalación..."
+    apt-get update -qq
+    apt-get install -y nmap
+    if [ $? -eq 0 ]; then
+        echo -e "\e[32m[Ok]\e[0m Nmap instalado correctamente."
+    else
+        echo -e "\e[31m[ERROR]\e[0m Fallo al instalar Nmap. Abortando."
+        exit 1
+    fi
+fi
+
+# Comprobamos Osquery
+if ! command -v osqueryi &> /dev/null; then
+    echo -e "\e[33m[!]\e[0m 'osqueryi' no detectado. Añadiendo repositorio oficial e instalando..."
+    
+    # 1. Instalamos herramientas necesarias para añadir repos
+    apt-get update -qq
+    apt-get install -y curl gnupg software-properties-common
+    
+    # 2. Descargamos la clave GPG oficial de Osquery (método moderno y seguro para Ubuntu 24.04)
+    curl -fsSL https://pkg.osquery.io/deb/pubkey.gpg | gpg --dearmor --yes -o /usr/share/keyrings/osquery-archive-keyring.gpg
+    
+    # 3. Añadimos el repositorio oficial a la lista de apt
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/osquery-archive-keyring.gpg] https://pkg.osquery.io/deb deb main" | tee /etc/apt/sources.list.d/osquery.list > /dev/null
+    
+    # 4. Actualizamos e instalamos
+    apt-get update -qq
+    apt-get install -y osquery
+    
+    if [ $? -eq 0 ]; then
+        echo -e "\e[32m[Ok]\e[0m Osquery instalado correctamente."
+    else
+        echo -e "\e[31m[ERROR]\e[0m Fallo al instalar Osquery. Verifica tu conexión a internet."
+        exit 1
+    fi
+fi
+
 # Ejecutar la aplicación
 ./venv/bin/python main.py "$@"

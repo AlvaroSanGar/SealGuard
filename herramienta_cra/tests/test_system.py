@@ -89,12 +89,57 @@ class TestSystemModule(unittest.TestCase):
         self.assertEqual(resultado[0]['ecosystem'], 'Debian')
         self.assertEqual(resultado[0]['type'], 'System (APT)')
 
-    @patch('modules.system.ejecutar_consulta')
-    def test_paquetes_python(self, mock_ejecutar):
-        mock_ejecutar.return_value = [{"name": "requests", "version": "2.25.1"}]
-        resultado = mSystem.paquetes_python()
-        self.assertEqual(resultado[0]['ecosystem'], 'PyPI')
-        self.assertEqual(resultado[0]['type'], 'Python (PIP)')
 
+
+    @patch('modules.system.subprocess.run')
+    def test_ejecutar_consulta_json_invalido(self, mock_run):
+        """Prueba qué pasa si OSquery devuelve texto plano o un error en vez de un JSON"""
+        mock_proceso = MagicMock()
+        mock_proceso.stdout = "Error fatal del sistema OSquery" # No es formato JSON
+        mock_run.return_value = mock_proceso
+
+        resultado = mSystem.ejecutar_consulta("SELECT * FROM test;")
+        self.assertEqual(resultado, []) # Debe ser capturado por except Exception y devolver vacío
+
+    @patch('modules.system.subprocess.run')
+    def test_obtener_interfaces_linea_corta_o_malformada(self, mock_run):
+        """Verifica que el if len(partes) >= 4 protege contra líneas malformadas"""
+        # La primera línea tiene solo 3 elementos (rompería el index si no estuviese protegido)
+        salida_falsa = '''
+1: lo inet
+2: eth0 inet 192.168.1.50/24 brd 192.168.1.255 scope global eth0
+'''
+        mock_proceso = MagicMock()
+        mock_proceso.stdout = salida_falsa.strip()
+        mock_run.return_value = mock_proceso
+
+        resultado = mSystem.obtener_interfaces()
+        
+        # 'lo' no debe haberse procesado porque la línea era corta
+        self.assertNotIn('lo', resultado)
+        # 'eth0' sí debe estar
+        self.assertIn('eth0', resultado)
+
+    @patch('modules.system.info_sis')
+    def test_ESCANEO_info_Simple(self, mock_info):
+        """Prueba la función principal o wrapper del módulo"""
+        # Falseamos lo que devuelve info_sis
+        mock_info.return_value = {
+            "hostname": "MVServidor",
+            "sistema": "Linux",
+            "dist": "Ubuntu",
+            "version": "22.04",
+            "kernel": "5.15.0",
+            "arquitectura": "x86_64"
+        }
+        
+        # Probamos con verbose=False
+        resultado_silencioso = mSystem.ESCANEO_info_Simple(False)
+        self.assertEqual(resultado_silencioso['hostname'], "MVServidor")
+        
+        # Probamos con verbose=True para asegurar que los print_c no rompen la ejecución
+        resultado_hablador = mSystem.ESCANEO_info_Simple(True)
+        self.assertEqual(resultado_hablador['arquitectura'], "x86_64")
+        
 if __name__ == '__main__':
     unittest.main()

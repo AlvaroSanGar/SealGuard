@@ -160,7 +160,7 @@ def auditar_protecciones_dos(verbose):
         "net.ipv4.icmp_echo_ignore_broadcasts"
     ]
     nombres_sql = ",".join([f"'{n}'" for n in nombres])
-    query = str('SELECT name, current_value FROM system_controls WHERE name IN ("'+nombres_sql+'");')
+    query = str('SELECT name, current_value FROM system_controls WHERE name IN ('+nombres_sql+');')
     res = ejecutar_consulta(query)
     
     # [CORRECCIÓN] Inicializamos por defecto en 0. Si OSquery falla o no los lista, asumimos que son vulnerables.

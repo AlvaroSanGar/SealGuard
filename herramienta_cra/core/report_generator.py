@@ -27,12 +27,13 @@ def calcular_resumen_dinamico(datos):
         total_criticos += 1
 
     # Vulnerabilidades
-    vulns = datos.get("vulns", [])
-    if len(vulns) == 0:
-        resumen.append({"nombre": "2. Vulnerabilidades", "estado": "SEGURO", "clase": "bg-safe"})
+    paquetes_vulnerables = datos.get("vulns", [])
+    
+    if len(paquetes_vulnerables) == 0:
+        resumen.append({"nombre": "2. Gestión de Vulnerabilidades", "estado": "SEGURO", "clase": "bg-safe"})
         total_seguros += 1
     else:
-        resumen.append({"nombre": "2. Vulnerabilidades", "estado": "PELIGRO", "clase": "bg-danger"})
+        resumen.append({"nombre": "2. Gestión de Vulnerabilidades", "estado": "PELIGRO", "clase": "bg-danger"})
         total_criticos += 1
 
     # Integridad del Sistema
@@ -97,7 +98,7 @@ def calcular_resumen_dinamico(datos):
     res_boot = analizar_modulo_complejo("6. Arranque Seguro", datos.get("boot", datos.get("booting", {})))
     
     # Resiliencia
-    res_disp = analizar_modulo_complejo("7. Resiliencia (Disponibilidad)", datos.get("disponibilidad", {}))
+    res_disp = analizar_modulo_complejo("7. Disponibilidad", datos.get("disponibilidad", {}))
 
     # Volcamos los resultados y sumamos las métricas
     for res in [res_identidad, res_hardening, res_boot, res_disp]:
@@ -131,15 +132,13 @@ def obtener_ruta_escritorio_real():
     return ruta_desktop
 
 
-
-
 def generar_informe(fecha, datos):    
     # Invocamos el cálculo antes de renderizar
     calcular_resumen_dinamico(datos)
     
     id_reporte = "CRA-" + str(int(time.time()))
     ruta_escritorio = obtener_ruta_escritorio_real()
-    ruta_pdf = os.path.join(ruta_escritorio, f'Reporte_CRA_{id_reporte}.pdf')
+    ruta_pdf = os.path.join(ruta_escritorio, f'Reporte_{id_reporte}.pdf')
     
     try:
         env = Environment(loader=FileSystemLoader('templates'))
@@ -166,7 +165,7 @@ def generar_informe(fecha, datos):
             # Cambiamos el dueño (uid) y el grupo (gid) del archivo PDF recién creado
             os.chown(ruta_pdf, user_info.pw_uid, user_info.pw_gid)
 
-        print_c(f"[Ok] Reporte generado en: {ruta_pdf}\n")
-
+        print_c("[Ok] Reporte generado en: "+str(ruta_pdf)+"\n")
+        os._exit(0)
     except Exception as e:
-        print_c(f"[ERROR] Fallo crítico al generar el informe: {e}")
+        print_c("[ERROR] Fallo crítico al generar el informe: "+str(e))

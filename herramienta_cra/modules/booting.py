@@ -26,7 +26,9 @@ def auditar_integridad_firmware(verbose):
         black_list = config["boot"]["integridad_kernel"]["black_list"]
         
     except KeyError:
-        print_c("     [ERROR] No se ha encontrado la configuración de parametros del kernel en config.yaml")
+        msg = "No se ha encontrado la configuración de parametros del kernel en config.yaml"
+        print_c("     [ERROR] "+str(msg))
+        resultados["detalles"].append(msg)
         white_list = [["P", 1, "Módulo propietario"], ["O", 4096, "Módulo externo"]]
         warning_list = [["W", 512, "Warning"], ["C", 1024, "Staging"], ["K", 32768, "Live patched"]]
         black_list = [["F", 2, "Forzado"], ["R", 8, "Forzado unload"], ["D", 128, "OOPS/BUG"], ["A", 256, "ACPI"], ["E", 8192, "No firmado"]]
@@ -93,6 +95,8 @@ def auditar_integridad_firmware(verbose):
         # Comprobamos las flags haciendo XOR ya que cada una es una potencia de dos
         else:
             for val in (white_list+black_list+warning_list):
+                if len(val) < 3:
+                    continue
                 val_bit = val[1]
                 val_desc = val[2]
                 if resul_tai & val_bit:
@@ -220,7 +224,7 @@ def auditar_parametros_kernel(verbose):
                     op = opcion
                     break
                     
-                if opcion in grub_def:
+                elif opcion in grub_def:
                     aparece_default = True
                     op = opcion
             
@@ -341,13 +345,6 @@ def auditar_seguridad_grub(verbose, datos_grub):
         "pass_msg": ""
     }
     
-      # Cargamos los datos del .yaml
-    try:
-        contra = config["boot"]["contra_fisica"]
-    
-    except KeyError:
-        contra = False
-    
     # Comprobamos si datos_grub_hardening existe y tiene datos significativos (es decir, que se ha analizado correctamente)
     if not datos_grub or datos_grub.get("estado") == "NO ENCONTRADO":
         alerta = "El archivo de configuración de GRUB no fue encontrado por el módulo de hardening"
@@ -430,12 +427,8 @@ def auditar_seguridad_grub(verbose, datos_grub):
 
 
     ######### Catalogamos el resultado final #####################################################
-    # Caso de que todo esté correcto
-    if resultados["protegido"] and resultados["permisos_ok"]:
-        resultados["estado"] = "SEGURO"
-    
-    # Caso de que algo falle   
-    elif resultados["permisos_ok"] and not contra:
+    # Caso de que los permisos sean correctos (la contra no es obligatoria)  
+    if resultados["permisos_ok"]:
         resultados["estado"] = "SEGURO"
     
     else:

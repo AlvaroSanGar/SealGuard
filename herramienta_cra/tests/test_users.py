@@ -191,5 +191,26 @@ class TestUsuariosModulo(unittest.TestCase):
         # Verificamos que usó el 1000 por defecto
         mock_info.assert_called_with(False, 1000)
 
+    @patch('modules.users.comprobar')
+    @patch('os.path.exists')
+    def test_comp_2FA_ssh_parcialmente_configurado(self, mock_exists, mock_comprobar):
+        """Prueba de Seguridad: Falta el parámetro principal de PAM en SSH"""
+        
+        # Simulamos que existe el archivo sshd_config
+        mock_exists.side_effect = lambda path: path == '/etc/ssh/sshd_config'
+        
+        # Simulamos que comprobar() devuelve la parte secundaria pero le falta 'UsePAM yes'
+        mock_comprobar.side_effect = [
+            [], # common-auth
+            ['ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes'] # sshd_config
+        ]
+        
+        # Le pasamos un usuario cualquiera para no fallar el bucle final
+        usuarios = [{'username': 'user1', 'directory': '/home/user1'}]
+        res = mUsers.comp_2FA(verbose=False, usuarios=usuarios)
+        
+        # La herramienta debe detectar que la configuración es inválida
+        self.assertFalse(res['ssh_config_valido'])
+        
 if __name__ == '__main__':
     unittest.main(verbosity=2)

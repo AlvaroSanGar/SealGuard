@@ -79,60 +79,15 @@ def info_sis():
     return info
 
 
-# NUEVA FUNCIÓN: Detección de familia de Sistema Operativo para compatibilidad
-def obtener_familia_os():
-    data = ejecutar_consulta("SELECT platform, name FROM os_version;")
-    if data and len(data) > 0:
-        plataforma = data[0].get("platform", "").lower()
-        nombre = data[0].get("name", "").lower()
-        
-        # Familia Debian (Ubuntu, Mint, PopOS...)
-        if "ubuntu" in plataforma or "debian" in nombre or "debian" in plataforma:
-            return "debian"
-        
-        # Familia RedHat (Fedora, CentOS, RHEL, AlmaLinux...)
-        elif "centos" in plataforma or "fedora" in nombre or "redhat" in nombre or "rhel" in nombre or "almalinux" in nombre:
-            return "redhat"
-            
-    return "desconocido"
-
-
-# Paquetes instalados con adaptación de familia OS
+# Paquetes instalados con APT
 def paquetes_instalados():
-    familia = obtener_familia_os()
-    
-    if familia == "debian":
-        query = "SELECT name, version FROM deb_packages;"
-        resultado = ejecutar_consulta(query)
-        for p in resultado:
-            # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns
-            p['ecosystem'] = 'Debian'
-            p['type'] = 'System (APT)'
-        return resultado
-        
-    elif familia == "redhat":
-        # En Fedora/RedHat buscamos paquetes RPM
-        query = "SELECT name, version FROM rpm_packages;"
-        resultado = ejecutar_consulta(query)
-        for p in resultado:
-            # Usamos AlmaLinux como ecosistema compatible para la API de OSV.dev
-            p['ecosystem'] = 'AlmaLinux' 
-            p['type'] = 'System (RPM)'
-        return resultado
-        
-    else:
-        return []
-
-# Paquetes de Python con pip
-def paquetes_python():
-    query = "SELECT name, version FROM python_packages;"
-    resultado = ejecutar_consulta(query)        
-    # Igual que antes
+    query = "SELECT name, version FROM deb_packages;"
+    resultado = ejecutar_consulta(query)
     for p in resultado:
-        p['ecosystem'] = 'PyPI'
-        p['type'] = 'Python (PIP)'
+        # Añadimos estas claves en el diccionario para poder catalogar los paquetes más tarde en el módulo vulns, aunque el de ecosistem lo vamos a ignorar
+        p['ecosystem'] = 'Debian'
+        p['type'] = 'System (APT)'
     return resultado
-
 
 
 
@@ -141,7 +96,6 @@ def ESCANEO_info_Simple(verbose):
     # Info del sistema
     info = info_sis() # Es un diccionario 
     if verbose:
-        print("")
         print_c("[+] Información del sistema: ")
         print_c("     [i] Hostname:      "+info['hostname'])
         print_c("     [i] Sistema:       "+info['dist']+" "+info['version'])

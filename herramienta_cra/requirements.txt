@@ -5,3 +5,4 @@ osquery
 requests
 weasyprint
 Jinja2
+cvss

@@ -2,7 +2,6 @@ import os
 import datetime
 import modules.system as mSystem
 from config.settings import config
-from modules.system import obtener_familia_os
 from core.colores_terminal import print_c, mostrar_subtitulos
 
 
@@ -11,7 +10,12 @@ def info_usuarios_base(verbose, uid_min):
     print_c("[+] Recopilando información base de usuarios")
     ######################## Obtenemos la info necesaria de settings.yaml ###################################
     resultado = []
-    critical_groups = config["users"]["critical_groups"]
+    try:
+        critical_groups = config["users"]["critical_groups"]
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han cargado los grupos por defecto")
+        critical_groups = ["root", "sudo", "adm"]
+
     if verbose:
         print_c("     [i] Grupos marcados como críticos: "+str(critical_groups))
     
@@ -138,7 +142,12 @@ def juntar_datos(usuarios, usu_grupos_criticos, datos_shadow):
 def politicas_passwords(verbose):
     print("")
     print_c("[+] Auditando políticas de contraseñas generales")
-    politicas = config["users"]["politics"]
+    try:
+        politicas = config["users"]["politics"]
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido los atributos defecto")
+        politicas = ["PASS_MAX_DAYS", "PASS_MIN_DAYS", "PASS_WARN_AGE", "UID_MIN", "USERGROUPS_ENAB", "DEFAULT_HOME", "LOGIN_RETRIES", "LOGIN_TIMEOUT"]
+
     politica_general = {}
     try:
         with open("/etc/login.defs", "r") as f:
@@ -177,15 +186,25 @@ def politicas_passwords(verbose):
 
 
 ###########################################################################################################################
-
-
 def comp_2FA(verbose, usuarios):
     print("")
     print_c("[+] Buscando métodos de doble factor de autentificación")
-    modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
-    servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
+    try:
+        modulos_2fa = config["users"]["mfa"]["modulos_pam_2fa"]
+        servicios_pam = config["users"]["mfa"]["servicios_pam_a_revisar"]
+        mapa_tokens = config["users"]["mfa"]["tokens_requeridos"]
+
+    except KeyError:
+        print_c("   [ERROR] No se ha podido cargar la configuración de controls.yaml, se han introducido la configuración por defecto")
+        modulos_2fa = ["pam_google_authenticator.so", "pam_duo.so", "pam_yubico.so", "pam_u2f.so"]
+        servicios_pam = ["sshd", "sudo", "login"]
+        mapa_tokens = {
+            ".google_authenticator": "pam_google_authenticator.so",
+            ".yubico": "pam_yubico.so"
+        }
+
     params_ssh = ['UsePAM yes', 'ChallengeResponseAuthentication yes', 'KbdInteractiveAuthentication yes']
-    mapa_tokens = config["users"]["mfa"]["tokens_requeridos"]
+    
     
     reporte_2fa = {
         'mfa_global': False,
@@ -195,24 +214,13 @@ def comp_2FA(verbose, usuarios):
         'usuarios_token': []
     }
     
-    # Adaptación dinámica de archivos PAM según la familia del SO
-    familia = obtener_familia_os()
-    
-    if familia == "redhat":
-        archivo_pam_base = "/etc/pam.d/system-auth"
-        str_include = "include system-auth"
-    else:
-        # Por defecto tratamos como familia Debian
-        archivo_pam_base = "/etc/pam.d/common-auth"
-        str_include = "@include common-auth"
-    
     #######################################################################################################################
-    if os.path.exists(archivo_pam_base):
-        modulos_common = comprobar(archivo_pam_base, modulos_2fa)
+    if os.path.exists("/etc/pam.d/common-auth"):
+        modulos_common = comprobar("/etc/pam.d/common-auth", modulos_2fa)
         if modulos_common:
             reporte_2fa["mfa_global"] = True
             if verbose:
-                print_c("     [i] Se han hallado los siguientes módulos en " + archivo_pam_base + ":")
+                print_c("     [i] Se han hallado los siguientes módulos en /etc/pam.d/common-auth:")
                 for m in modulos_common:
                     print_c("         - "+str(m))
     else:
@@ -225,11 +233,11 @@ def comp_2FA(verbose, usuarios):
         
         # Comprobamos si el servicio PAM existe antes de leerlo
         if os.path.exists(arch):
-            comp = modulos_2fa + [str_include] # Usamos el include correspondiente al sistema
+            comp = modulos_2fa + ['@include common-auth'] #Comprobamos si existen los módulos del yaml o incluye la config del common-auth
             confirmacion = comprobar(arch, comp)
-            if ((str_include in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
+            if (('@include common-auth' in confirmacion) and (reporte_2fa['mfa_global'])) or any(con in modulos_2fa for con in confirmacion):
                 reporte_2fa['servicios'][servicio]['protegido'] = True
-                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el include dinámico si usa la config general)
+                reporte_2fa['servicios'][servicio]['detalles'] = confirmacion #Guardamos el módulo que tenga (o el @include common-auth si usa la config general)
         else:
             # Si el servicio no está instalado, se considera seguro (no es un vector de ataque)
             reporte_2fa['servicios'][servicio]['protegido'] = True
@@ -297,7 +305,7 @@ def comp_2FA(verbose, usuarios):
     return reporte_2fa
 
 
-# Buscamos una serie de strings clave en el archivo indicado y devolvemos los que hemos encontrado (similar a politicas_password)
+    # Buscamos una serie de strings clave en el archivo indicado y devolvemos los que hemos encontrado (similar a politicas_password)
 def comprobar(archivo, buscar):
     resultado = []
     try:
@@ -317,8 +325,6 @@ def comprobar(archivo, buscar):
         print_c(" [ERROR] No se ha podido acceder al archivo "+str(archivo)+": "+str(e))
     
     return list(set(resultado)) # Nos evitamos duplicados 
-
-
 
 
 def ESCANER_usuarios(verbose):

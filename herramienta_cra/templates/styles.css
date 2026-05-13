@@ -218,7 +218,6 @@ ul { margin-top: 5px; padding-left: 20px; }
     color: var(--navy-blue);
 }
 
-/* Magia de WeasyPrint: Pone los puntitos y el número de página automáticamente */
 .toc-list a::after {
     content: leader('.') target-counter(attr(href), page);
     color: #7f8c8d;
@@ -512,3 +511,21 @@ ul { margin-top: 5px; padding-left: 20px; }
     line-height: 1.6;
 }
 
+
+/* Evitamos que se parta una fila al cambiar de página */
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+/* Clase para el pie de página al final del informe */
+.report-footer-final {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 8pt;
+    color: #7f8c8d;
+    padding-bottom: 20px;
+}

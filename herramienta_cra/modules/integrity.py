@@ -42,15 +42,14 @@ def generar_baseline():
     print("")
     print_c("[+] Iniciando recopilación de hashes críticos")
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
-    binarios = config['integrity']['monitored_binaries']
-    configs_int = config['integrity']['monitored_configs']
-    todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))
-    
+    try:
+        rutas_a_auditar = config["integrity"]
+    except KeyError as e:
+        rutas_a_auditar = []
     baseline = {}
     
     # Para cada archivo nos guardamos el hash asociado y lo metemos en un diccionario
-    for ruta in todas_las_rutas:
+    for ruta in rutas_a_auditar:
         hash_val = calcular_integridad(ruta)
         # Comprobamos que nos devuelve la función, solo lo guardamos si obtenemos exitosamente el hash
         if hash_val == None:
@@ -89,10 +88,10 @@ def verificar_integridad(verbose):
     print_c("[+] Iniciando módulo de integridad")
     
     # Cargamos los archivos de settings
-    archivos_criticos = [item['path'] for item in config['hardening']['critical_files']]
-    binarios = config['integrity']['monitored_binaries']
-    configs_int = config['integrity']['monitored_configs']
-    todas_las_rutas = list(set(archivos_criticos + binarios + configs_int))
+    try:
+        rutas_a_auditar = config["integrity"]
+    except KeyError as e:
+        rutas_a_auditar = []
     
     comp = {}
     
@@ -107,7 +106,7 @@ def verificar_integridad(verbose):
         return None
     
     # Obtenemos los hashes igual que en baseline
-    for ruta in todas_las_rutas:
+    for ruta in rutas_a_auditar:
         hash_val = calcular_integridad(ruta)
         
         # Comprobamos que nos devuelve la función, solo lo guardamos si obtenemos exitosamente el hash

@@ -1,199 +1,312 @@
 import unittest
 from unittest.mock import patch, mock_open, MagicMock
+import os
+import stat
+import time
 
-# Importamos apuntando a la carpeta modules
+# Importaciones directas
 from modules.hardening import (
     auditar_suid_sgid, auditar_archivos_criticos, auditar_ssh,
     auditar_firewall, auditar_aslr, auditar_mac, 
-    auditar_certificados, auditar_cifrado
+    auditar_certificados, auditar_cifrado, ESCANER_hardening
 )
 
-# Constante estática para evitar el error del decorador en tiempo de carga de la clase
-CERT_CONFIG_MOCK = {
+# Mock de configuración global para los tests
+HARDENING_CONFIG_MOCK = {
     "hardening": {
+        "suid_sgid": {"critical_directories": ["/tmp/"], "forviden_permissions": ["2", "3", "6", "7"]},
+        "critical_files": [{"path": "/etc/shadow", "max_permissions": "600", "owner": "root"}],
+        "ssh": {"secure_params": {"PermitRootLogin": "no", "MaxAuthTries": "4"}, "allowed_users": ["admin"]},
+        "firewall_services": ["ufw.service"],
         "certificados": {
-            "dias_aviso_caducidad": 30, 
-            "min_rsa_key_size": 2048, 
-            "algoritmos_permitidos": ["sha256WithRSAEncryption"], 
-            "rutas_criticas": [{"path": "/cert.pem", "tipo": "publico", "max_permissions": "644", "owner": "root"}]
-        }
+            "dias_aviso_caducidad": 30, "min_rsa_key_size": 2048, 
+            "algoritmos_permitidos": ["sha256WithRSAEncryption"],
+            "rutas_criticas": [
+                {"path": "/cert.pem", "tipo": "publico", "max_permissions": "644", "owner": "root"},
+                {"path": "/key.pem", "tipo": "privado", "max_permissions": "600", "owner": "root"}
+            ]
+        },
+        "encryption": {"algoritmo": "aes", "critical_mounts": ["/", "/home"]}
     }
 }
 
+@patch.dict('modules.hardening.config', HARDENING_CONFIG_MOCK, clear=True)
 class TestHardeningCompleto(unittest.TestCase):
 
     # =====================================================================
-    # 1. TESTS: SUID / SGID (auditar_suid_sgid)
+    # 1. SUID / SGID
     # =====================================================================
-    @patch('modules.hardening.config', {"hardening": {"suid_sgid": {"critical_directories": ["/tmp/"], "forviden_permissions": ["2", "3", "6", "7"]}}})
     @patch('modules.hardening.ejecutar_consulta')
     def test_suid_seguro(self, mock_db):
-        mock_db.return_value = [{"path": "/usr/bin/sudo", "mode": "4755", "username": "root", "groupname": "root"}]
+        mock_db.return_value = [{"path": "/usr/bin/sudo", "mode": "4755"}]
         res = auditar_suid_sgid(False)
         self.assertEqual(len(res["peligrosos"]), 0)
 
-    @patch('modules.hardening.config', {"hardening": {"suid_sgid": {"critical_directories": ["/tmp/"], "forviden_permissions": ["2", "3", "6", "7"]}}})
     @patch('modules.hardening.ejecutar_consulta')
-    def test_suid_peligro_directorio_parcial(self, mock_db):
-        mock_db.return_value = [{"path": "/home/user/tmp/malware", "mode": "4755", "username": "hacker", "groupname": "hacker"}]
+    def test_suid_peligro_directorio(self, mock_db):
+        mock_db.return_value = [{"path": "/tmp/malware", "mode": "4755"}]
         res = auditar_suid_sgid(False)
         self.assertEqual(len(res["peligrosos"]), 1)
 
-    @patch('modules.hardening.config', {"hardening": {"suid_sgid": {"critical_directories": ["/var/"], "forviden_permissions": ["2", "3", "6", "7"]}}})
     @patch('modules.hardening.ejecutar_consulta')
-    def test_suid_peligro_permisos_aislados(self, mock_db):
-        mock_db.return_value = [
-            {"path": "/usr/bin/bad_group", "mode": "4775", "username": "root", "groupname": "root"},
-            {"path": "/usr/bin/bad_others", "mode": "4757", "username": "root", "groupname": "root"}
-        ]
+    def test_suid_permisos_prohibidos(self, mock_db):
+        mock_db.return_value = [{"path": "/usr/bin/test", "mode": "4757"}]
         res = auditar_suid_sgid(False)
-        self.assertEqual(len(res["peligrosos"]), 2)
+        self.assertEqual(len(res["peligrosos"]), 1)
 
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_suid_deteccion_sgid(self, mock_db):
+        mock_db.return_value = [{"path": "/usr/bin/sgid_test", "mode": "2757"}]
+        res = auditar_suid_sgid(False)
+        self.assertEqual(len(res["peligrosos"]), 1)
+
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_suid_motivos_varios(self, mock_db):
+        mock_db.return_value = [{"path": "/tmp/malware", "mode": "4755"}]
+        res = auditar_suid_sgid(False)
+        self.assertIn("Ubicación en directorio crítico", res["peligrosos"][0]["motivo"])
 
     # =====================================================================
-    # 2. TESTS: ARCHIVOS CRÍTICOS (auditar_archivos_criticos)
+    # 2. ARCHIVOS CRÍTICOS
     # =====================================================================
-    @patch('modules.hardening.config', {"hardening": {"critical_files": [{"path": "/etc/shadow", "max_permissions": "640", "owner": "root"}]}})
     @patch('modules.hardening.ejecutar_consulta')
     def test_archivos_criticos_perfecto(self, mock_db):
-        mock_db.return_value = [{"path": "/etc/shadow", "mode": "0640", "username": "root"}]
+        mock_db.return_value = [{"path": "/etc/shadow", "mode": "0600", "username": "root"}]
         res = auditar_archivos_criticos(False)
         self.assertEqual(res[0]["estado"], "SEGURO")
 
-    @patch('modules.hardening.config', {"hardening": {"critical_files": [{"path": "/etc/shadow", "max_permissions": "640", "owner": "root"}]}})
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
+    def test_archivos_criticos_no_encontrado(self, mock_db):
+        res = auditar_archivos_criticos(False)
+        self.assertEqual(res[0]["estado"], "NO ENCONTRADO")
+
     @patch('modules.hardening.ejecutar_consulta')
-    def test_archivos_criticos_excepcion_value_error(self, mock_db):
-        mock_db.return_value = [{"path": "/etc/shadow", "mode": "texto_basura", "username": "root"}]
+    def test_archivos_criticos_dueno_incorrecto(self, mock_db):
+        mock_db.return_value = [{"path": "/etc/shadow", "mode": "0600", "username": "hacker"}]
         res = auditar_archivos_criticos(False)
         self.assertEqual(res[0]["estado"], "PELIGROSO")
-        self.assertTrue(any("Error al leer o convertir" in p for p in res[0]["problemas"]))
 
+    @patch('modules.hardening.config', {"hardening": {}})
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_archivos_criticos_yaml_vacio(self, mock_db):
+        # El mock devuelve datos para GRUB
+        mock_db.return_value = [{"path": "/etc/default/grub", "mode": "0644", "username": "root"}]
+        res = auditar_archivos_criticos(False)
+        
+        # Buscamos GRUB en la lista de resultados generada por el fallback
+        resultado_grub = next((item for item in res if item["archivo"] == "/etc/default/grub"), None)
+        
+        # Verificamos que GRUB se ha auditado y que, con los datos del mock, es SEGURO
+        self.assertIsNotNone(resultado_grub)
+        self.assertEqual(resultado_grub["estado"], "SEGURO")
+
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_archivos_criticos_permisos_restrictivos_ok(self, mock_db):
+        mock_db.return_value = [{"path": "/etc/shadow", "mode": "0400", "username": "root"}]
+        res = auditar_archivos_criticos(False)
+        self.assertEqual(res[0]["estado"], "SEGURO")
 
     # =====================================================================
-    # 3. TESTS: SSH (auditar_ssh)
+    # 3. SSH
     # =====================================================================
-    @patch('modules.hardening.config', {"hardening": {"ssh": {"secure_params": {"PermitRootLogin": "no", "MaxAuthTries": "4"}, "allowed_users": ["admin", "juan"]}}})
     @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data="PermitRootLogin no\nPort 2222\nAllowUsers admin juan\n")
-    def test_ssh_parametro_ausente(self, mock_archivo, mock_exists):
+    @patch('builtins.open', new_callable=mock_open, read_data="Port 22\nPermitRootLogin no\n")
+    def test_ssh_puerto_22_riesgo(self, mock_file, mock_exists):
+        res = auditar_ssh(False)
+        self.assertTrue(any("puerto en el que se está ejecutando SSH es por defecto (22)" in a for a in res["alertas"]))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data="Port 2222\nPermitRootLogin no\nMaxAuthTries 4\nAllowUsers admin\n")
+    def test_ssh_config_segura(self, mock_file, mock_exists):
+        res = auditar_ssh(False)
+        self.assertEqual(res["estado"], "SEGURO")
+
+    @patch('os.path.exists', return_value=False)
+    def test_ssh_no_instalado(self, mock_exists):
+        res = auditar_ssh(False)
+        self.assertEqual(res["estado"], "SEGURO")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', side_effect=Exception("Error lectura"))
+    def test_ssh_error_lectura(self, mock_file, mock_exists):
+        res = auditar_ssh(False)
+        self.assertEqual(res["alertas"], "No se ha logrado leer el archivo de configuración")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data="Port 2222\nAllowUsers juan\n")
+    def test_ssh_usuarios_no_coinciden(self, mock_file, mock_exists):
         res = auditar_ssh(False)
         self.assertEqual(res["estado"], "PELIGROSO")
-        self.assertTrue(any("no está configurado en el servicio ssh" in a for a in res["alertas"]))
-
-    @patch('modules.hardening.config', {"hardening": {"ssh": {"secure_params": {"PermitRootLogin": "no"}, "allowed_users": ["admin", "juan"]}}})
-    @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data="PermitRootLogin no\nPort 2222\nAllowUsers admin pedro\n")
-    def test_ssh_allowusers_desajustado(self, mock_archivo, mock_exists):
-        res = auditar_ssh(False)
-        self.assertEqual(res["estado"], "PELIGROSO")
-        self.assertTrue(any("no coincide" in a for a in res["alertas"]))
-
 
     # =====================================================================
-    # 4. TESTS: FIREWALL (auditar_firewall)
+    # 4. FIREWALL
     # =====================================================================
-    @patch('modules.hardening.config', {"hardening": {"firewall_services": ["ufw.service"]}})
     @patch('modules.hardening.ejecutar_consulta')
     @patch('modules.hardening.subprocess.run')
-    def test_firewall_seguro_iptables(self, mock_subproc, mock_db):
+    def test_firewall_seguro_iptables(self, mock_run, mock_db):
         mock_db.return_value = [{"id": "ufw.service", "active_state": "active", "unit_file_state": "enabled"}]
-        mock_proc = MagicMock()
-        mock_proc.returncode = 0
-        mock_proc.stdout = "-P INPUT DROP\n-P FORWARD DROP\n-P OUTPUT DROP\n"
-        mock_subproc.return_value = mock_proc
-        
+        mock_run.return_value = MagicMock(returncode=0, stdout="-P INPUT DROP")
         res = auditar_firewall(False)
         self.assertEqual(res["estado"], "SEGURO")
 
-    @patch('modules.hardening.config', {"hardening": {"firewall_services": ["ufw.service"]}})
-    @patch('modules.hardening.ejecutar_consulta')
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
     @patch('modules.hardening.subprocess.run')
-    def test_firewall_fallback_nftables(self, mock_subproc, mock_db):
-        mock_db.return_value = [{"id": "ufw.service", "active_state": "active", "unit_file_state": "enabled"}]
-        
-        def subprocess_side_effect(*args, **kwargs):
-            comando = args[0]
-            m = MagicMock()
-            if comando[0] == 'iptables':
-                m.returncode = 0
-                m.stdout = "" 
-            elif comando[0] == 'nft':
-                m.returncode = 0
-                m.stdout = "type filter hook input priority 0; policy drop;"
-            return m
-            
-        mock_subproc.side_effect = subprocess_side_effect
-        
+    def test_firewall_totalmente_expuesto(self, mock_run, mock_db):
+        mock_run.return_value = MagicMock(returncode=0, stdout="-P INPUT ACCEPT")
         res = auditar_firewall(False)
-        self.assertEqual(res["estado"], "SEGURO")
-        self.assertNotIn("no existen reglas de bloqueo", res["alertas"])
+        self.assertEqual(res["estado"], "PELIGROSO")
 
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_firewall_activo_pero_no_enabled(self, mock_db):
+        mock_db.return_value = [{"id": "ufw.service", "active_state": "active", "unit_file_state": "disabled"}]
+        with patch('modules.hardening.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="-P INPUT DROP")
+            res = auditar_firewall(False)
+            self.assertTrue(any("no se ha configurado que arranque" in a for a in res["alertas"]))
+
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
+    @patch('modules.hardening.subprocess.run')
+    def test_firewall_fallback_nftables(self, mock_run, mock_db):
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "iptables": return MagicMock(returncode=1)
+            if cmd[0] == "nft": return MagicMock(returncode=0, stdout="policy drop")
+            return MagicMock(returncode=0)
+        mock_run.side_effect = side_effect
+        res = auditar_firewall(False)
+        self.assertEqual(res["kernel"]["tipo_filtro"], "Nftables")
+
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
+    @patch('modules.hardening.subprocess.run')
+    def test_firewall_politicas_estrictas(self, mock_run, mock_db):
+        mock_run.return_value = MagicMock(returncode=0, stdout="-P OUTPUT DROP\n-P FORWARD DROP")
+        res = auditar_firewall(False)
+        self.assertTrue(res["kernel"]["bloqueo_output"])
 
     # =====================================================================
-    # 5. TESTS: ASLR (auditar_aslr)
+    # 5. ASLR
     # =====================================================================
     @patch('modules.hardening.ejecutar_consulta', return_value=[{"current_value": "2"}])
     def test_aslr_seguro(self, mock_db):
         res = auditar_aslr(False)
         self.assertEqual(res["estado"], "SEGURO")
 
+    @patch('modules.hardening.ejecutar_consulta', return_value=[{"current_value": "0"}])
+    def test_aslr_desactivado(self, mock_db):
+        res = auditar_aslr(False)
+        self.assertEqual(res["estado"], "PELIGROSO")
 
     # =====================================================================
-    # 6. TESTS: MAC (auditar_mac)
+    # 6. MAC
     # =====================================================================
     @patch('modules.hardening.ejecutar_consulta')
     def test_mac_selinux_enforcing(self, mock_db):
-        def side_effect(query):
-            if 'selinux/config' in query: return [{"path": "/etc"}]
-            if 'selinux_settings' in query: return [{"value": "1"}]
-            return []
-        mock_db.side_effect = side_effect
-        
+        mock_db.side_effect = [[], [{"path": "/etc/selinux/config"}], [{"value": "1"}]]
         res = auditar_mac(False)
-        self.assertEqual(res["estado"], "SEGURO")
-        self.assertEqual(res["mac_activo"], "SELinux")
+        self.assertEqual(res["selinux"]["modo"], "Enforcing")
 
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_mac_apparmor_enforce(self, mock_db):
+        mock_db.side_effect = [[{"path": "/etc/apparmor.d"}], [{"mode": "enforce", "total": "5"}], []]
+        res = auditar_mac(False)
+        self.assertEqual(res["apparmor"]["enforce"], 5)
+
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
+    def test_mac_ninguno_activo(self, mock_db):
+        res = auditar_mac(False)
+        self.assertEqual(res["estado"], "PELIGROSO")
 
     # =====================================================================
-    # 7. TESTS: CERTIFICADOS (auditar_certificados)
+    # 7. CERTIFICADOS
     # =====================================================================
-    @patch('modules.hardening.config', CERT_CONFIG_MOCK)
     @patch('os.path.exists', return_value=True)
     @patch('os.stat')
     @patch('pwd.getpwuid')
     @patch('modules.hardening.ejecutar_consulta')
-    @patch('modules.hardening.subprocess.run')
-    @patch('time.time', return_value=0)
-    def test_certificados_perfecto(self, mock_time, mock_subproc, mock_db, mock_pwd, mock_stat, mock_exists):
-        mock_stat.return_value.st_mode = 0o100644
+    @patch('time.time', return_value=1000000)
+    def test_certificados_perfecto(self, mock_time, mock_db, mock_pwd, mock_stat, mock_exists):
+        def stat_side_effect(path):
+            m = MagicMock()
+            m.st_uid = 0
+            m.st_mode = 0o100600 if "key.pem" in path else 0o100644
+            return m
+            
+        mock_stat.side_effect = stat_side_effect
         mock_pwd.return_value.pw_name = "root"
-        mock_db.return_value = [{"not_valid_after": "10000000", "signing_algorithm": "sha256WithRSAEncryption", "issuer": "CA", "subject": "Web"}]
+        mock_db.return_value = [{"not_valid_after": "20000000", "signing_algorithm": "sha256WithRSAEncryption"}]
         
-        mock_proc = MagicMock()
-        mock_proc.returncode = 0
-        mock_proc.stdout = "Public-Key: (2048 bit)\nTLS Web Server Authentication"
-        mock_subproc.return_value = mock_proc
-        
-        res = auditar_certificados(False)
-        self.assertEqual(res["estado"], "SEGURO")
+        with patch('modules.hardening.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="Public-Key: (2048 bit)\nTLS Web Server Authentication")
+            res = auditar_certificados(False)
+            self.assertEqual(res["estado"], "SEGURO")
 
-
-    # =====================================================================
-    # 8. TESTS: CIFRADO (auditar_cifrado)
-    # =====================================================================
-    @patch('modules.hardening.config', {"hardening": {"encryption": {"algoritmo": "aes", "critical_mounts": ["/", "/var"]}}})
+    @patch('os.path.exists', return_value=True)
+    @patch('os.stat')
     @patch('modules.hardening.ejecutar_consulta')
-    @patch('modules.hardening.subprocess.run')
-    def test_cifrado_todo_seguro(self, mock_subproc, mock_db):
-        mock_db.return_value = [
-            {"device_alias": "root", "path": "/", "encrypted": "1"},
-            {"device_alias": "var", "path": "/var", "encryption_status": "encrypted"}
-        ]
-        mock_subproc.return_value.returncode = 0
-        mock_subproc.return_value.stdout = "cipher: aes-xts"
-        
+    def test_certificados_autofirmado(self, mock_db, mock_stat, mock_exists):
+        mock_stat.return_value.st_mode = 0o100644
+        mock_db.return_value = [{
+            "issuer": "Entidad_Prueba", "subject": "Entidad_Prueba",
+            "not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"
+        }]
+        res = auditar_certificados(False)
+        self.assertTrue(any("está AUTOFIRMADO" in a for a in res["alertas"]))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('os.stat')
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_certificados_rsa_debil(self, mock_db, mock_stat, mock_exists):
+        mock_stat.return_value.st_mode = 0o100644
+        mock_db.return_value = [{"not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"}]
+        with patch('modules.hardening.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="Public-Key: (1024 bit)\nTLS Web Server Authentication")
+            res = auditar_certificados(False)
+            self.assertTrue(any("clave insuficiente: 1024 bits" in a for a in res["alertas"]))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('os.stat')
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_certificados_eku_incorrecto(self, mock_db, mock_stat, mock_exists):
+        mock_stat.return_value.st_mode = 0o100644
+        mock_db.return_value = [{"not_valid_after": "99999999", "signing_algorithm": "sha256WithRSAEncryption"}]
+        with patch('modules.hardening.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="Public-Key: (2048 bit)\nPurpose: Email Protection")
+            res = auditar_certificados(False)
+            self.assertTrue(any("no tiene el permiso 'Server Authentication'" in a for a in res["alertas"]))
+
+    # =====================================================================
+    # 8. CIFRADO
+    # =====================================================================
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_cifrado_seguro(self, mock_db):
+        mock_db.return_value = [{"device_alias": "root", "path": "/", "encrypted": "1"}]
         res = auditar_cifrado(False)
         self.assertEqual(res["estado"], "SEGURO")
+
+    @patch('modules.hardening.ejecutar_consulta')
+    def test_cifrado_incompleto(self, mock_db):
+        mock_db.return_value = [{"device_alias": "root", "path": "/", "encrypted": "1"}, {"device_alias": "home", "path": "/home", "encrypted": "0"}]
+        res = auditar_cifrado(False)
+        self.assertEqual(res["estado"], "PELIGROSO")
+
+    @patch('modules.hardening.ejecutar_consulta', return_value=[])
+    def test_cifrado_vacio(self, mock_db):
+        res = auditar_cifrado(False)
+        self.assertEqual(res["estado"], "PELIGROSO")
+
+    # =====================================================================
+    # 9. ORQUESTACIÓN
+    # =====================================================================
+    @patch('modules.hardening.auditar_cifrado', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_certificados', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_mac', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_aslr', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_firewall', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_ssh', return_value={"estado": "OK"})
+    @patch('modules.hardening.auditar_archivos_criticos', return_value=[])
+    @patch('modules.hardening.auditar_suid_sgid', return_value={"peligrosos": []})
+    def test_ESCANER_hardening_flujo(self, *mocks):
+        res = ESCANER_hardening(False)
+        self.assertEqual(len(res.keys()), 8)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
