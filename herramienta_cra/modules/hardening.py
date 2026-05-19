@@ -980,7 +980,6 @@ def auditar_certificados(verbose):
 
 
 #################################################################################################################################
-import subprocess
 
 def auditar_cifrado(verbose):
     print("")
