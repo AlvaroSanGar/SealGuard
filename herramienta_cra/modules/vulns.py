@@ -488,7 +488,7 @@ def procesar_resultados_batch(resultados_osv, paquetes_meta, cfg_vulns, sesion):
 
     # Recolectamos varias variables y preparamos todo
     min_cvss = float(cfg_vulns.get("min_cvss_score", 0.0))
-    lista_ignorados = set(cfg_vulns.get("ignorar", []))
+    lista_ignorados = set(cfg_vulns.get("ignorar") or [])
     usar_tracker = TIPO_TRACKER is not None
 
     # Aquí vamos a acumular los CVEs con sus paquetes
