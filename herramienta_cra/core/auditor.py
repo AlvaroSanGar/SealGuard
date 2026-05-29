@@ -30,7 +30,10 @@ def seleccionar(mode, verbose):
             generar_escaneo_baseline()
 
         case "configure":
-            opBBDD.mostrar_tabla("baseline")
+            tiene_arch = opBBDD.mostrar_tabla("baseline")
+            if not tiene_arch:
+                print_c("[-] Finalizando la herramienta")
+                return
             id_str = print_input("[i] Seleccione el id del nuevo archivo baseline o pulse la tecla 'Q' para salir: ")
             if id_str.lower() != 'q':
                 try:
@@ -40,7 +43,10 @@ def seleccionar(mode, verbose):
                     print_c("[ERROR] Debes introducir ID válido.")
         
         case "recover":
-            opBBDD.mostrar_tabla("reportes")
+            tiene_arch = opBBDD.mostrar_tabla("reportes")
+            if not tiene_arch:
+                print_c("[-] Finalizando la herramienta")
+                return
             id_str = print_input("[i] Seleccione el id del reporte que desea generar o pulse la tecla 'Q' para salir: ")
             if id_str.lower() != 'q':
                 try:
@@ -56,8 +62,8 @@ def seleccionar(mode, verbose):
                     print_c("[ERROR] Introduzca un ID válido")
             
         case "history":
-            opBBDD.mostrar_tabla("baseline")
-            opBBDD.mostrar_tabla("reportes") 
+            _ = opBBDD.mostrar_tabla("baseline")
+            _ = opBBDD.mostrar_tabla("reportes") 
             
         case "delete":
             opBBDD.borrar_BBDD()     

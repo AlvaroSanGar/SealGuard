@@ -91,6 +91,7 @@ def mostrar_tabla(tabla):
         # Mostramos los resultados de forma bonita
         if not registros:
             print_c("[i] La tabla '"+str(tabla)+"' existe, pero actualmente está vacía.")
+            return False
         else:
             print_table("\n--- [ CONTENIDO DE LA TABLA: "+str(tabla.upper())+" ] ---")
             print_table("  id  |           fecha            ")
@@ -104,9 +105,11 @@ def mostrar_tabla(tabla):
                 print_table(f" {id_registro:>4} | {fecha:<26}")
             # Info extra del num de registros que hay                
             print_table("("+str(len(registros))+" filas)\n")
+            return True
 
     except sqlite3.Error as e:
         print_c("[ERROR] Fallo al consultar la tabla '"+str(tabla)+"': "+str(e))
+        return False
         
     finally:
         if con:
