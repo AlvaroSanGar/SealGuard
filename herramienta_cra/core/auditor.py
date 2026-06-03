@@ -9,7 +9,6 @@ from modules.availability import ESCANER_disponibilidad
 import core.operadorBBDD as opBBDD
 from core.report_generator import generar_informe
 from datetime import datetime
-from os import path
 from core.colores_terminal import print_c, print_input, print_table
 
 
@@ -21,15 +20,15 @@ def seleccionar(mode, verbose):
         
     match mode:
         case "scan":
-            if path.exists('history/escaneo_baseline.json'):
+            if opBBDD.obtener_baseline_activo():
                 escaneo_normal(verbose)
             else:
-                print_c("[ERROR] El archivo 'history/escaneo_baseline.json' no existe, por favor ejecute un escaneo de tipo baseline")
+                print_c("[ERROR] No existe ningún baseline activo en la BBDD, por favor ejecute un escaneo de tipo baseline")
         
         case "baseline":
             generar_escaneo_baseline()
 
-        case "configure":
+        case "config-bl":
             tiene_arch = opBBDD.mostrar_tabla("baseline")
             if not tiene_arch:
                 print_c("[-] Finalizando la herramienta")

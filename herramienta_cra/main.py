@@ -33,14 +33,14 @@ def main():
         "--mode", 
         type=str, 
         required=True, 
-        choices=["scan", "baseline", "configure", "recover", "history", "delete", "edit-config"],
+        choices=["scan", "baseline", "config-bl", "recover", "history", "delete", "edit-config"],
         help=(
             "Modo de ejecución de la herramienta:\n"
             "  scan        - Ejecuta un escaneo completo\n"
-            "  baseline    - Genera una línea base de integridad\n"
-            "  configure   - Selecciona un archivo baseline\n"
+            "  baseline    - Genera un archivo baselinede integridad\n"
+            "  config-bl   - Selecciona un archivo baseline\n"
             "  recover     - Recupera un reporte anterior en PDF\n"
-            "  history     - Muestra el historial de la BBDD\n"
+            "  history     - Muestra el contenido de la BBDD\n"
             "  delete      - Borra la BBDD local\n"
             "  edit-config - Abre el archivo YAML para personalizar la herramienta"
         )

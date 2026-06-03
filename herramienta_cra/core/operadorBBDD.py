@@ -49,7 +49,8 @@ def crear_BBDD():
             CREATE TABLE IF NOT EXISTS baseline (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fecha DATE NOT NULL,
-                datos_baseline JSON NOT NULL                         
+                datos_baseline JSON NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 0                         
             );
         ''')
 
@@ -84,8 +85,11 @@ def mostrar_tabla(tabla):
         con = sqlite3.connect(DDBB_path)
         cursor = con.cursor()
         
-        # Ejecutamos la consulta. 
-        cursor.execute("SELECT id, fecha FROM "+str(tabla)+";")
+        # Ejecutamos la consulta, incluyendo activo si es la tabla baseline
+        if tabla == "baseline":
+            cursor.execute("SELECT id, fecha, activo FROM baseline;")
+        else:
+            cursor.execute("SELECT id, fecha FROM reportes;")
         registros = cursor.fetchall()
         
         # Mostramos los resultados de forma bonita
@@ -94,15 +98,23 @@ def mostrar_tabla(tabla):
             return False
         else:
             print_table("\n--- [ CONTENIDO DE LA TABLA: "+str(tabla.upper())+" ] ---")
-            print_table("  id  |           fecha            ")
-            print_table("------+----------------------------")
+            if tabla == "baseline":
+                print_table("  id  |           fecha            | activo ")
+                print_table("------+----------------------------+--------")
+            else:
+                print_table("  id  |           fecha            ")
+                print_table("------+----------------------------")
             
             # Rellenamos las filas
             for fila in registros:
                 id_registro = str(fila[0])
                 fecha = str(fila[1])
                 # {:>4} alinea el ID a la derecha ocupando 4 espacios {:<26} alinea la fecha a la izquierda ocupando 26 espacios
-                print_table(f" {id_registro:>4} | {fecha:<26}")
+                if tabla == "baseline":
+                    activo_str = "  [*]  " if fila[2] == 1 else "       "
+                    print_table(f" {id_registro:>4} | {fecha:<26} |{activo_str}")
+                else:
+                    print_table(f" {id_registro:>4} | {fecha:<26}")
             # Info extra del num de registros que hay                
             print_table("("+str(len(registros))+" filas)\n")
             return True
@@ -150,8 +162,14 @@ def insertar_elemento(archivo, tipo, fecha_actual):
         cursor = con.cursor()
         
         # Usamos execute con parámetros (?, ?) para evitar que las comillas del JSON rompan el SQL
-        query = "INSERT INTO "+str(tipo)+" (fecha, "+str(columna_datos)+") VALUES (?, ?)"
-        cursor.execute(query, (fecha_actual, datos_json))
+        if tipo == "baseline":
+            # Desactivamos el baseline anterior y marcamos el nuevo como activo
+            cursor.execute("UPDATE baseline SET activo = 0;")
+            query = "INSERT INTO "+str(tipo)+" (fecha, "+str(columna_datos)+", activo) VALUES (?, ?, 1)"
+            cursor.execute(query, (fecha_actual, datos_json))
+        else:
+            query = "INSERT INTO "+str(tipo)+" (fecha, "+str(columna_datos)+") VALUES (?, ?)"
+            cursor.execute(query, (fecha_actual, datos_json))
         
         con.commit()
         print_c("[i] Datos insertados con éxito en la tabla '"+str(tipo)+"'")
@@ -178,8 +196,6 @@ def borrar_BBDD():
     conf = print_input("¿Seguro que deseas borrar la BBDD? Escribe 'borrar' para confirmar: ")
     if str(conf.lower()) == "borrar":
         try:
-            os.remove('history/escaneo_baseline.json')
-            print_c("[i] El archivo baseline borrado con éxito")
             os.remove(DDBB_path)
             print_c("[i] Base de datos borrada con éxito")
 
@@ -255,13 +271,50 @@ def seleccionar_baseline(id):
     print_c("[+] Asignando el nuevo archivo baseline (id "+str(id)+")")
     archivo = obtener_elemento(id, "baseline")
     if archivo:
+        con = None
         try:
-            with open('history/escaneo_baseline.json', 'w') as f:
-                json.dump(archivo["datos"], f)
-            print_c("[-] El archivo baseline se ha asignado con éxito\n")
+            con = sqlite3.connect(DDBB_path)
+            cursor = con.cursor()
+            cursor.execute("UPDATE baseline SET activo = 0;")
+            cursor.execute("UPDATE baseline SET activo = 1 WHERE id = ?;", (id,))
+            con.commit()
+            print_c("[-] El archivo baseline se ha asignado con exito\n")
             return 
     
         except Exception as e:
             print_c("[ERROR] No se ha podido asignar el archivo baseline: "+str(e))
             return
+        finally:
+            if con:
+                con.close()
     print_c("[ERROR] No se ha podido obtener el archivo baseline indicado")
+
+
+######### OBTENER BASELINE ACTIVO ################################################
+def obtener_baseline_activo():
+    if not os.path.exists(DDBB_path):
+        return None
+    
+    con = None
+    try:
+        con = sqlite3.connect(DDBB_path)
+        cursor = con.cursor()
+        cursor.execute("SELECT datos_baseline FROM baseline WHERE activo = 1 ORDER BY id DESC LIMIT 1;")
+        registro = cursor.fetchone()
+        
+        if not registro:
+            return None
+        
+        try:
+            return json.loads(registro[0])
+        except Exception as e:
+            print_c("[ERROR] No se han podido obtener los datos del baseline activo: "+str(e))
+            return None
+
+    except sqlite3.Error as e:
+        print_c("[ERROR] "+str(e))
+        return None
+        
+    finally:
+        if con:
+            con.close()

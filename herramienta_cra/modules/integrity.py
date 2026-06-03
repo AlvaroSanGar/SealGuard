@@ -3,6 +3,7 @@ import json
 import os
 from config.settings import config
 from core.colores_terminal import print_c, mostrar_subtitulos
+import core.operadorBBDD as opBBDD
 
 
 def calcular_integridad(ruta):
@@ -63,10 +64,8 @@ def generar_baseline():
             baseline[ruta] = hash_val
             print_c("     [i] Hash del archivo '"+ruta+"' añadido con exito")
 
-    # Lo guardamos en el archivo json
+    # Lo devolvemos para que el auditor lo almacene en la BBDD
     try:
-        with open('history/escaneo_baseline.json', 'w') as f:
-            json.dump(baseline, f)
         print("")
         print_c("[-] El archivo baseline se ha generado con éxito\n")
         return baseline
@@ -81,8 +80,9 @@ def generar_baseline():
 
 def verificar_integridad(verbose):
     # Comprobamos que se ha realizado un escaneo baseline anteriormente
-    if not (os.path.exists('history/escaneo_baseline.json')):
-        print_c("[!] No se puede realizar el escaneo de integridad ya que el archivo 'history/escaneo_baseline.json' no existe")
+    guardados = opBBDD.obtener_baseline_activo()
+    if not guardados:
+        print_c("[!] No se puede realizar el escaneo de integridad ya que no existe ningún baseline activo en la BBDD")
         return None
     print("")
     print_c("[+] Iniciando módulo de integridad")
@@ -94,16 +94,6 @@ def verificar_integridad(verbose):
         rutas_a_auditar = []
     
     comp = {}
-    
-    # Cargamos los hashes del archivo escaneo_baseline.json
-    try:
-        with open('history/escaneo_baseline.json') as f:
-            guardados = json.load(f)
-            
-    except Exception as e:
-        print_c("[ERROR] No se ha podido cargar el archivo baseline: "+str(e))
-        print_c("[-] Finalizando módulo de integridad")
-        return None
     
     # Obtenemos los hashes igual que en baseline
     for ruta in rutas_a_auditar:
