@@ -10,6 +10,12 @@ class CustomArgumentParser(argparse.ArgumentParser):
     def print_help(self, file=None):
         # Obtenemos el texto del menú de ayuda como un string
         help_text = self.format_help()
+        # Traducciones estrictamente necesarias
+        help_text = help_text.replace("usage:", "Uso:")
+        help_text = help_text.replace("options:", "Opciones:")
+        help_text = help_text.replace("optional arguments:", "Opciones:")
+        help_text = help_text.replace("show this help message and exit", "Muestra este mensaje de ayuda y sale")
+        
         # Imprimimos línea por línea usando tu función de colores
         for line in help_text.splitlines():
             print_table(line)
