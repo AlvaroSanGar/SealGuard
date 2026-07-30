@@ -37,8 +37,25 @@ la creación del entorno virtual y la instalación de Nmap y OSquery.
 | `--mode=edit-config` | Edita la configuración |
 
 ## Documentación
-La memoria completa del proyecto está disponible en el repositorio 
-y se recomienda su lectura para comprender el diseño y las decisiones técnicas.
+ 
+La memoria completa del proyecto (TFG) se publicará próximamente en este repositorio.
+ 
+## Licencia
+SealGuard es software libre: puedes usarlo, estudiarlo, modificarlo y redistribuirlo
+bajo los términos de la Licencia Pública General de GNU (GPL) versión 3, publicada
+por la Free Software Foundation, ya sea la versión 3 o (a tu elección) cualquier
+versión posterior.
+
+En la práctica esto significa que:
+- Puedes usar SealGuard libremente, para cualquier fin.
+- Puedes modificarlo y crear tus propias versiones.
+- Si distribuyes SealGuard o una versión modificada, debes:
+  - hacerlo también bajo GPLv3 (o posterior), con el código fuente disponible;
+  - conservar el aviso de copyright y de licencia original;
+  - indicar claramente qué archivos has modificado.
+
+SealGuard se distribuye con la esperanza de que sea útil, pero sin ninguna garantía;
+consulta el texto completo en [`LICENSE`](./LICENSE) para todos los detalles.
 
 ## Autor
 Álvaro Sánchez Garijo — UCLM, ESII
