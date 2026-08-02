@@ -30,15 +30,52 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Gestión del entorno virtual
-if [ ! -d "venv" ]; then
-    echo -e "\e[36m[i]\e[0m Entorno virtual no detectado. Creándolo e instalando dependencias..."
+if [ ! -f "requirements.txt" ]; then
+    echo -e "\e[31m[ERROR]\e[0m ¡No se encuentra el archivo 'requirements.txt' en la carpeta actual!"
+    exit 1
+fi
+
+crear_venv() {
+    rm -rf venv
     python3 -m venv venv
-    
-    if [ -f "requirements.txt" ]; then
-        ./venv/bin/pip install -r requirements.txt
-    else
-        echo -e "\e[31m[ERROR]\e[0m ¡No se encuentra el archivo 'requirements.txt' en la carpeta actual!"
-        exit 1
+}
+
+if [ ! -x "venv/bin/python" ]; then
+    echo -e "\e[36m[i]\e[0m Entorno virtual no detectado o incompleto. Creándolo..."
+    crear_venv
+fi
+
+# Comprueba, importando de verdad cada paquete, que el venv tiene todo lo necesario.
+# Detecta tanto un venv recién creado como uno preexistente pero incompleto/corrupto
+# (instalación a medias, creación interrumpida, proyecto movido de carpeta, etc.).
+verificar_dependencias() {
+    ./venv/bin/python - <<'PYEOF' 2>/dev/null
+import sys
+modulos = ["nmap", "yaml", "colorama", "osquery", "requests", "weasyprint", "jinja2", "cvss"]
+faltan = []
+for m in modulos:
+    try:
+        __import__(m)
+    except ImportError:
+        faltan.append(m)
+sys.exit(1 if faltan else 0)
+PYEOF
+}
+
+instalar_dependencias() {
+    ./venv/bin/python -m pip install -r requirements.txt
+}
+
+if ! verificar_dependencias; then
+    echo -e "\e[36m[i]\e[0m Instalando/actualizando dependencias de Python..."
+    if ! instalar_dependencias; then
+        echo -e "\e[33m[!]\e[0m Fallo instalando dependencias; el entorno virtual podría estar dañado."
+        echo -e "\e[36m[i]\e[0m Reconstruyendo el entorno virtual desde cero y reintentando..."
+        crear_venv
+        if ! instalar_dependencias; then
+            echo -e "\e[31m[ERROR]\e[0m Fallo al instalar las dependencias de Python. Abortando."
+            exit 1
+        fi
     fi
 fi
 
