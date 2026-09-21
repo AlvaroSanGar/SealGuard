@@ -15,7 +15,7 @@ mapeando los hallazgos técnicos del sistema a los requisitos esenciales del Ane
 
 ## Instalación y uso
 ```bash
-git clone <repositorio>
+git clone https://github.com/AlvaroSanGar/SealGuard.git
 cd herramienta_cra
 chmod +x sealguard
 ./sealguard --mode=scan
